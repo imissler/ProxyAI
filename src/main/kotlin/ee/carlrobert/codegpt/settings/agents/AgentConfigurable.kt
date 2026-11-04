@@ -5,6 +5,7 @@ import com.intellij.openapi.ui.DialogPanel
 import com.intellij.ui.dsl.builder.bindIntValue
 import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.panel
+import com.intellij.ui.layout.selected
 import ee.carlrobert.codegpt.CodeGPTBundle
 import ee.carlrobert.codegpt.settings.configuration.AutoCompactSettings
 import ee.carlrobert.codegpt.settings.configuration.ConfigurationSettings
@@ -27,7 +28,7 @@ class AgentConfigurable : BoundConfigurable("Agent") {
                         5
                     )
                         .bindIntValue(state::autoCompactThresholdPercent)
-                        .enabledIf(autoCompact.selected)
+                        .enabledIf(autoCompact.component.selected)
                         .comment(
                             CodeGPTBundle.get(
                                 "agentConfigurable.autoCompactThreshold.description",
