@@ -11,7 +11,9 @@ class MessageWithContext(
     @Transient
     val tags: List<TagDetails> = emptyList(),
     val uiVisible: Boolean = true,
-    val uiText: String = text
+    val uiText: String = text,
+    /** Only compacts the session history; nothing is sent to the model. */
+    val compactOnly: Boolean = false
 ) {
 
     @Transient

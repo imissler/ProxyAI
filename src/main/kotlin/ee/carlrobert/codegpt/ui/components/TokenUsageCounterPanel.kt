@@ -1,6 +1,7 @@
 package ee.carlrobert.codegpt.ui.components
 
 import ai.koog.prompt.llm.LLModel
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
@@ -18,12 +19,17 @@ import ee.carlrobert.codegpt.toolwindow.agent.TokenUsageEvent
 import ee.carlrobert.codegpt.toolwindow.agent.TokenUsageListener
 import ee.carlrobert.codegpt.util.coroutines.DisposableCoroutineScope
 import ee.carlrobert.codegpt.util.coroutines.withEdt
+import java.awt.Cursor
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
 import java.text.NumberFormat
 import java.util.*
+import javax.swing.SwingUtilities
 
 class TokenUsageCounterPanel(
     private val project: Project? = null,
-    private val sessionId: String
+    private val sessionId: String,
+    private val onCompactRequested: (() -> Unit)? = null
 ) : JBLabel() {
 
     companion object {
@@ -52,6 +58,18 @@ class TokenUsageCounterPanel(
         font = JBFont.small()
         border = JBUI.Borders.empty(5, 7)
         isVisible = false
+        if (onCompactRequested != null) {
+            icon = AllIcons.Actions.Collapseall
+            iconTextGap = JBUI.scale(4)
+            cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+            addMouseListener(object : MouseAdapter() {
+                override fun mouseClicked(e: MouseEvent) {
+                    if (SwingUtilities.isLeftMouseButton(e)) {
+                        onCompactRequested.invoke()
+                    }
+                }
+            })
+        }
         setupMessageBusConnection()
     }
 
@@ -126,6 +144,9 @@ class TokenUsageCounterPanel(
         toolTipText = buildString {
             append("<html><body>")
             append("<b>Usage Details</b><br>")
+            if (onCompactRequested != null) {
+                append("<i>Click to compact the conversation (same as /compact)</i><br>")
+            }
             append("Current usage: ${numberFormat.format(totalTokens)} tokens<br>")
             lastReportedSizeTokens?.let {
                 append("Reported context size: ${numberFormat.format(it)} tokens<br>")

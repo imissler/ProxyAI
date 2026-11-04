@@ -14,6 +14,7 @@ import ai.koog.prompt.Prompt
 import ai.koog.prompt.executor.model.PromptExecutor
 import ai.koog.prompt.llm.LLMProvider
 import ai.koog.prompt.message.Message
+import ai.koog.prompt.message.ResponseMetaInfo
 import ai.koog.prompt.streaming.StreamFrame
 import ai.koog.prompt.streaming.toMessageResponse
 import ai.koog.prompt.tokenizer.PromptTokenizer
@@ -30,6 +31,7 @@ import ee.carlrobert.codegpt.toolwindow.agent.AgentCreditsEvent
 import ee.carlrobert.codegpt.ui.textarea.TagProcessorFactory
 import ee.carlrobert.codegpt.ui.textarea.header.tag.TagDetails
 import java.util.*
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import ee.carlrobert.codegpt.conversations.message.Message as ChatMessage
@@ -49,7 +51,9 @@ internal interface AgentRunStrategyProvider {
 
 data class HistoryCompressionConfig(
     val isLimitExceeded: (Prompt, PromptTokenizer) -> Boolean,
-    val compressionStrategy: HistoryCompressionStrategy
+    val compressionStrategy: HistoryCompressionStrategy,
+    /** Also gates the retry after a context-overflow error. */
+    val isAutoCompactEnabled: () -> Boolean = { true }
 )
 
 internal const val SINGLE_RUN_NODE_CALL_LLM = "call_llm"
@@ -72,6 +76,11 @@ internal class SingleRunStrategyProvider : AgentRunStrategyProvider {
                 SINGLE_RUN_NODE_CALL_LLM
             ) { message ->
                 llm.writeSession {
+                    if (message.compactOnly) {
+                        return@writeSession compactOnDemand(historyCompressionConfig, tokenizer(), events)
+                    }
+                    compressHistoryIfNeeded(historyCompressionConfig, tokenizer(), events)
+
                     if (message.tags.isNotEmpty()) {
                         val context = buildTagContext(project, message.tags)
                         if (context.isNotBlank()) {
@@ -88,7 +97,8 @@ internal class SingleRunStrategyProvider : AgentRunStrategyProvider {
                         events,
                         sessionId,
                         provider,
-                        stream
+                        stream,
+                        historyCompressionConfig
                     )
                 }
             }
@@ -131,7 +141,8 @@ internal class SingleRunStrategyProvider : AgentRunStrategyProvider {
                         events,
                         sessionId,
                         provider,
-                        stream
+                        stream,
+                        historyCompressionConfig
                     )
                 }
             }
@@ -159,7 +170,8 @@ internal class SingleRunStrategyProvider : AgentRunStrategyProvider {
                         events,
                         sessionId,
                         provider,
-                        stream
+                        stream,
+                        historyCompressionConfig
                     )
                 }
             }
@@ -212,11 +224,80 @@ private suspend fun AIAgentLLMWriteSession.requestAndPublish(
     events: AgentEvents,
     sessionId: String,
     provider: ServiceType,
-    stream: Boolean
+    stream: Boolean,
+    compression: HistoryCompressionConfig
 ): ai.koog.prompt.message.Message.Assistant {
-    val response = requestResponses(stream, executor, config) { appendPrompt { message(it) } }
+    val response = try {
+        requestResponses(stream, executor, config) { appendPrompt { message(it) } }
+    } catch (e: Exception) {
+        if (e is CancellationException || !compression.isAutoCompactEnabled() || !isContextOverflowError(e)) throw e
+        recoverFromContextOverflow(compression, events)
+        requestResponses(stream, executor, config) { appendPrompt { message(it) } }
+    }
     publishUsageAndCredits(prompt, tokenizer, events, sessionId, provider, listOf(response))
     return response
+}
+
+/**
+ * Compacts the history before the next request when it is close to the context limit.
+ */
+internal suspend fun AIAgentLLMWriteSession.compressHistoryIfNeeded(
+    compression: HistoryCompressionConfig,
+    tokenizer: PromptTokenizer,
+    events: AgentEvents
+): Boolean {
+    if (!compression.isLimitExceeded(prompt, tokenizer)) {
+        return false
+    }
+    compressHistory(compression, events)
+    return true
+}
+
+private const val COMPACTED_MESSAGE = "Conversation compacted."
+private const val NOTHING_TO_COMPACT_MESSAGE = "Nothing to compact yet."
+
+/**
+ * Handles `/compact` and the compact button: summarizes the history without calling the model.
+ */
+private suspend fun AIAgentLLMWriteSession.compactOnDemand(
+    compression: HistoryCompressionConfig,
+    tokenizer: PromptTokenizer,
+    events: AgentEvents
+): ai.koog.prompt.message.Message.Assistant {
+    val hasHistory = prompt.messages.any { it is Message.User || it is Message.Assistant }
+    if (!hasHistory) {
+        return Message.Assistant(NOTHING_TO_COMPACT_MESSAGE, ResponseMetaInfo.Empty)
+    }
+    compressHistory(compression, events)
+    events.onTokenUsageAvailable(tokenizer.tokenCountFor(prompt).toLong())
+    return Message.Assistant(COMPACTED_MESSAGE, ResponseMetaInfo.Empty)
+}
+
+/**
+ * The provider rejected the request because the prompt did not fit. Compacts the history and
+ * keeps the pending user message so that the request can be sent again.
+ */
+private suspend fun AIAgentLLMWriteSession.recoverFromContextOverflow(
+    compression: HistoryCompressionConfig,
+    events: AgentEvents
+) {
+    val pendingUserMessage = prompt.messages.lastOrNull() as? Message.User
+    compressHistory(compression, events)
+    if (pendingUserMessage != null && prompt.messages.lastOrNull() != pendingUserMessage) {
+        appendPrompt { message(pendingUserMessage) }
+    }
+}
+
+private suspend fun AIAgentLLMWriteSession.compressHistory(
+    compression: HistoryCompressionConfig,
+    events: AgentEvents
+) {
+    events.onHistoryCompressionStateChanged(true)
+    try {
+        replaceHistoryWithTLDR(compression.compressionStrategy)
+    } finally {
+        events.onHistoryCompressionStateChanged(false)
+    }
 }
 
 internal fun appendableResponses(

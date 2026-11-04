@@ -34,6 +34,8 @@ class ConfigurationSettingsState : BaseState() {
     var methodNameGenerationEnabled by property(true)
     var captureCompileErrors by property(true)
     var autoFormattingEnabled by property(true)
+    var autoCompactEnabled by property(true)
+    var autoCompactThresholdPercent by property(AutoCompactSettings.DEFAULT_THRESHOLD_PERCENT)
     var tableData by map<String, String>()
     var chatCompletionSettings by property(ChatCompletionSettingsState())
     var codeCompletionSettings by property(CodeCompletionSettingsState())
@@ -57,6 +59,21 @@ class ChatCompletionSettingsState : BaseState() {
     var sendWithAltEnter by property(false)
     var sendWithCtrlEnter by property(false)
     var sendWithShiftEnter by property(false)
+}
+
+object AutoCompactSettings {
+    const val DEFAULT_THRESHOLD_PERCENT = 85
+    const val MIN_THRESHOLD_PERCENT = 50
+    const val MAX_THRESHOLD_PERCENT = 95
+
+    fun normalizeThresholdPercent(value: Int): Int =
+        value.coerceIn(MIN_THRESHOLD_PERCENT, MAX_THRESHOLD_PERCENT)
+
+    fun isEnabled(state: ConfigurationSettingsState = ConfigurationSettings.getState()): Boolean =
+        state.autoCompactEnabled
+
+    fun thresholdPercent(state: ConfigurationSettingsState = ConfigurationSettings.getState()): Int =
+        normalizeThresholdPercent(state.autoCompactThresholdPercent)
 }
 
 object ContextSuggestionSettings {

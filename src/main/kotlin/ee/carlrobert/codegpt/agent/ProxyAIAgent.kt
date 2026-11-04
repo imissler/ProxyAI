@@ -24,7 +24,8 @@ import ee.carlrobert.codegpt.agent.clients.shouldStream
 import ee.carlrobert.codegpt.agent.strategy.CODE_AGENT_COMPRESSION
 import ee.carlrobert.codegpt.agent.strategy.HistoryCompressionConfig
 import ee.carlrobert.codegpt.agent.strategy.SingleRunStrategyProvider
-import ee.carlrobert.codegpt.agent.strategy.buildHistoryTooBigPredicate
+import ee.carlrobert.codegpt.agent.strategy.buildAutoCompactPredicate
+import ee.carlrobert.codegpt.settings.configuration.AutoCompactSettings
 import ee.carlrobert.codegpt.agent.tools.McpAgentToolMarker
 import ee.carlrobert.codegpt.settings.configuration.ConfigurationSettings
 import ee.carlrobert.codegpt.settings.hooks.HookEventType
@@ -108,8 +109,9 @@ object ProxyAIAgent {
                 executor,
                 pendingMessageQueue,
                 HistoryCompressionConfig(
-                    isLimitExceeded = buildHistoryTooBigPredicate(computeAvailableInput(agentModel)),
-                    compressionStrategy = CODE_AGENT_COMPRESSION
+                    isLimitExceeded = buildAutoCompactPredicate(computeAvailableInput(agentModel)),
+                    compressionStrategy = CODE_AGENT_COMPRESSION,
+                    isAutoCompactEnabled = { AutoCompactSettings.isEnabled() }
                 ),
                 events,
                 sessionId,

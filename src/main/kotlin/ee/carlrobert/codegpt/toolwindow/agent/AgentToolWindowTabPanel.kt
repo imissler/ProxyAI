@@ -68,6 +68,7 @@ class AgentToolWindowTabPanel(
 ) : BorderLayoutPanel(), Disposable {
     companion object {
         private const val RECOVERED_CONVERSATION_RENDER_BATCH_SIZE = 6
+        private const val COMPACT_COMMAND = "/compact"
     }
 
     private data class RecoveredPendingToolCall(
@@ -113,7 +114,7 @@ class AgentToolWindowTabPanel(
         ).apply {
             isVisible = false
         }
-    private val tokenUsageCounterPanel = TokenUsageCounterPanel(project, sessionId)
+    private val tokenUsageCounterPanel = TokenUsageCounterPanel(project, sessionId, onCompactRequested = ::handleCompactRequest)
 
     private val userInputPanel = UserInputPanel(
         project,
@@ -288,8 +289,18 @@ class AgentToolWindowTabPanel(
             )
     }
 
+    private fun handleCompactRequest() {
+        if (project.service<AgentService>().isSessionRunning(sessionId)) return
+        submitMessage(MessageWithContext(text = COMPACT_COMMAND, compactOnly = true))
+    }
+
     private fun handleSubmit(text: String) {
         if (text.isBlank()) return
+        if (text.trim() == COMPACT_COMMAND) {
+            userInputPanel.clearText()
+            handleCompactRequest()
+            return
+        }
         val message = MessageWithContext(text, userInputPanel.getSelectedTags())
         if (initialMessageSubmitHandler != null) {
             initialMessageSubmitHandler.invoke(message)

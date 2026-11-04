@@ -5,6 +5,26 @@ import ai.koog.agents.core.dsl.extension.FactType
 import ai.koog.agents.core.dsl.extension.HistoryCompressionStrategy
 import ai.koog.prompt.Prompt
 import ai.koog.prompt.tokenizer.PromptTokenizer
+import ee.carlrobert.codegpt.settings.configuration.AutoCompactSettings
+
+/**
+ * Compaction starts once the history uses [thresholdPercent] of the available input budget,
+ * which leaves headroom for the next turn and for the compression requests themselves.
+ */
+fun autoCompactThreshold(availableInputTokens: Long, thresholdPercent: Int): Long =
+    (availableInputTokens * AutoCompactSettings.normalizeThresholdPercent(thresholdPercent) / 100)
+        .coerceAtLeast(1L)
+
+/**
+ * Reads the auto-compact settings on every call, so that changes apply to running sessions.
+ */
+fun buildAutoCompactPredicate(availableInputTokens: Long): (Prompt, PromptTokenizer) -> Boolean =
+    { prompt, tokenizer ->
+        AutoCompactSettings.isEnabled() &&
+                buildHistoryTooBigPredicate(
+                    autoCompactThreshold(availableInputTokens, AutoCompactSettings.thresholdPercent())
+                )(prompt, tokenizer)
+    }
 
 fun buildHistoryTooBigPredicate(maxPromptTokens: Long): (Prompt, PromptTokenizer) -> Boolean =
     { prompt, tokenizer ->
