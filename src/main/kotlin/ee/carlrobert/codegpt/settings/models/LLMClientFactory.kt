@@ -56,6 +56,9 @@ object LLMClientFactory {
                     organization = OpenAISettings.getCurrentState().organization,
                     baseUrl = baseUrl,
                     model = resolveOpenAICodeCompletionModel(),
+                    reasoningEffort = {
+                        OpenAISettings.getCurrentState().getEffectiveReasoningEffort(featureType)
+                    },
                     baseClient = HttpClientProvider.createHttpClient()
                 )
             }

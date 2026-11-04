@@ -41,12 +41,17 @@ internal fun LLMParams.toCustomOpenAIResponsesParams(
 ): OpenAIResponsesParams {
     val body = state.body
     val currentReasoning = (this as? OpenAIResponsesParams)?.reasoning
-    val bodyReasoning = body.findValue("reasoning").asReasoningConfig()
+    val rawReasoning = body.findValue("reasoning")
+    val bodyReasoning = rawReasoning.asReasoningConfig()
+    // Koog's ReasoningEffort enum can't represent every tier (e.g. "xhigh"). Send the reasoning
+    // object from the body as is instead of silently falling back to the default effort.
+    val passthroughReasoning = rawReasoning.takeIf { it.hasUnmappedReasoningEffort() }
 
     val mergedAdditionalProperties = buildMap {
         body
             .filterKeys { it !in CUSTOM_OPENAI_RESPONSES_RESERVED_BODY_KEYS }
             .forEach { (key, value) -> put(key, value.toJsonElement()) }
+        passthroughReasoning?.let { put("reasoning", it.toJsonElement()) }
     }.takeIf { it.isNotEmpty() }
 
     return OpenAIResponsesParams(
@@ -55,6 +60,7 @@ internal fun LLMParams.toCustomOpenAIResponsesParams(
         maxTokens = body.findValue("maxOutputTokens", "max_output_tokens").asInt() ?: maxTokens,
         numberOfChoices = numberOfChoices,
         reasoning = when {
+            passthroughReasoning != null -> null
             bodyReasoning == null -> currentReasoning
             currentReasoning == null -> bodyReasoning
             else -> ReasoningConfig(
@@ -197,6 +203,11 @@ private fun Any?.asReasoningConfig(): ReasoningConfig? {
         effort = effort,
         summary = summary
     )
+}
+
+private fun Any?.hasUnmappedReasoningEffort(): Boolean {
+    val effort = (this as? Map<*, *>)?.get("effort") as? String ?: return false
+    return effort.isNotBlank() && effort.asReasoningEffort() == null
 }
 
 private fun Any?.asReasoningEffort(): ReasoningEffort? = when (this) {

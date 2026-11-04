@@ -1,6 +1,10 @@
 package ee.carlrobert.codegpt.agent.clients
 
 import ai.koog.prompt.dsl.prompt
+import ai.koog.prompt.executor.clients.openai.OpenAIResponsesParams
+import ai.koog.prompt.executor.clients.openai.base.models.ReasoningEffort
+import ai.koog.prompt.executor.clients.openai.models.ReasoningConfig
+import ai.koog.prompt.executor.clients.openai.models.ReasoningSummary
 import ai.koog.prompt.llm.LLMCapability
 import ai.koog.prompt.llm.LLModel
 import ee.carlrobert.codegpt.settings.service.custom.CustomServiceChatCompletionSettingsState
@@ -59,6 +63,48 @@ class CustomOpenAIResponsesSerializationIntegrationTest : IntegrationTest() {
             val response = client.execute(prompt, model, emptyList())
 
             assertThat(response.textContent()).isEqualTo("Hello with flattened params")
+        }
+    }
+
+    fun testResponsesRequestsKeepXhighReasoningEffort() {
+        runBlocking {
+            val settings = CustomServiceChatCompletionSettingsState().apply {
+                url = System.getProperty("customOpenAI.baseUrl") + "/v1/responses"
+                headers.clear()
+                body.clear()
+                body["model"] = "custom-responses-model"
+                body["input"] = "\$OPENAI_MESSAGES"
+                body["reasoning"] = mapOf("effort" to "xhigh")
+            }
+            val client = CustomOpenAILLMClient.fromSettingsState("TEST_API_KEY", settings)
+            val model = LLModel(
+                id = "custom-responses-model",
+                provider = CustomOpenAILLMClient.CustomOpenAI,
+                capabilities = listOf(
+                    LLMCapability.OpenAIEndpoint.Responses,
+                    LLMCapability.Thinking
+                ),
+                contextLength = 128_000,
+                maxOutputTokens = 4_096
+            )
+            val prompt = prompt(
+                "custom-openai-xhigh",
+                OpenAIResponsesParams(
+                    reasoning = ReasoningConfig(
+                        effort = ReasoningEffort.MEDIUM,
+                        summary = ReasoningSummary.AUTO
+                    )
+                )
+            ) {
+                user("Think hard")
+            }
+
+            expectCustomOpenAI(BasicHttpExchange { request ->
+                assertThat(request.body["reasoning"]).isEqualTo(mapOf("effort" to "xhigh"))
+                ResponseEntity(openAiResponsesResponse("custom-responses-model", "ok"))
+            })
+
+            assertThat(client.execute(prompt, model, emptyList()).textContent()).isEqualTo("ok")
         }
     }
 
