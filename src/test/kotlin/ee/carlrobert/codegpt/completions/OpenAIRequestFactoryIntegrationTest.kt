@@ -14,6 +14,7 @@ import org.assertj.core.api.Assertions.assertThat
 import testsupport.IntegrationTest
 import java.io.File
 import ai.koog.prompt.message.Message as KoogMessage
+import ai.koog.prompt.message.MessagePart
 
 class OpenAIRequestFactoryIntegrationTest : IntegrationTest() {
 
@@ -30,7 +31,7 @@ class OpenAIRequestFactoryIntegrationTest : IntegrationTest() {
 
         val systemMessages = prompt.messages
             .filterIsInstance<KoogMessage.System>()
-            .map { it.content }
+            .map { it.textContent() }
         assertThat(systemMessages).isNotEmpty()
         val systemContent = systemMessages.first()
         assertThat(systemContent)
@@ -169,12 +170,12 @@ class OpenAIRequestFactoryIntegrationTest : IntegrationTest() {
 
         val msgs = prompt.messages
         assertThat(msgs).hasSize(2)
-        assertThat((msgs[0] as KoogMessage.System).content).contains(expectedSystem.trim())
-        assertThat((msgs[1] as KoogMessage.User).content).contains("What does the code do?")
-        assertThat((msgs[1] as KoogMessage.User).content).contains("/path/A.java")
-        assertThat((msgs[1] as KoogMessage.User).content).contains("class A {}")
-        assertThat((msgs[1] as KoogMessage.User).content).contains("/path/B.kt")
-        assertThat((msgs[1] as KoogMessage.User).content).contains("class B")
+        assertThat((msgs[0] as KoogMessage.System).textContent()).contains(expectedSystem.trim())
+        assertThat((msgs[1] as KoogMessage.User).textContent()).contains("What does the code do?")
+        assertThat((msgs[1] as KoogMessage.User).textContent()).contains("/path/A.java")
+        assertThat((msgs[1] as KoogMessage.User).textContent()).contains("class A {}")
+        assertThat((msgs[1] as KoogMessage.User).textContent()).contains("/path/B.kt")
+        assertThat((msgs[1] as KoogMessage.User).textContent()).contains("class B")
     }
 
     fun testDefaultPersonaIsFilteredInAskMode() {
@@ -193,7 +194,7 @@ class OpenAIRequestFactoryIntegrationTest : IntegrationTest() {
         val prompt = OpenAIRequestFactory().createChatCompletionPrompt(callParameters)
 
         val systemMessages =
-            prompt.messages.filterIsInstance<KoogMessage.System>().map { it.content }
+            prompt.messages.filterIsInstance<KoogMessage.System>().map { it.textContent() }
         assertThat(systemMessages.first()).contains(expectedSystem.trim())
     }
 
@@ -231,7 +232,7 @@ class OpenAIRequestFactoryIntegrationTest : IntegrationTest() {
 
         val systemMessages = prompt.messages
             .filterIsInstance<KoogMessage.System>()
-            .map { it.content }
+            .map { it.textContent() }
         assertThat(systemMessages).isNotEmpty()
         val systemContent = systemMessages.first()
         assertThat(systemContent)
@@ -263,7 +264,7 @@ class OpenAIRequestFactoryIntegrationTest : IntegrationTest() {
 
         val systemMessages = prompt.messages
             .filterIsInstance<KoogMessage.System>()
-            .map { it.content }
+            .map { it.textContent() }
         assertThat(systemMessages).isNotEmpty()
         val systemContent = systemMessages.first()
         assertThat(systemContent)
@@ -305,9 +306,9 @@ class OpenAIRequestFactoryIntegrationTest : IntegrationTest() {
             conversationHistory = null,
             diagnosticsInfo = null,
         )
-        assertThat(systemMessage.content).isEqualTo(expectedSystem)
+        assertThat(systemMessage.textContent()).isEqualTo(expectedSystem)
         val userMessage = prompt.messages[1] as KoogMessage.User
-        assertThat(userMessage.content).isEqualTo("Implement.")
+        assertThat(userMessage.textContent()).isEqualTo("Implement.")
     }
 
     fun testInlineEditFollowUpWithHistory() {
@@ -373,13 +374,13 @@ class OpenAIRequestFactoryIntegrationTest : IntegrationTest() {
             conversationHistory = parameters.conversationHistory,
             diagnosticsInfo = parameters.diagnosticsInfo,
         )
-        assertThat(systemMessage.content).isEqualTo(expectedSystem)
+        assertThat(systemMessage.textContent()).isEqualTo(expectedSystem)
         val prevUserMessage = prompt.messages[1] as KoogMessage.User
-        assertThat(prevUserMessage.content).isEqualTo("PREV_PROMPT")
+        assertThat(prevUserMessage.textContent()).isEqualTo("PREV_PROMPT")
         val prevResponse = prompt.messages[2] as KoogMessage.Assistant
-        assertThat(prevResponse.content).isEqualTo("PREV_RESPONSE")
+        assertThat(prevResponse.textContent()).isEqualTo("PREV_RESPONSE")
         val followUpMessage = prompt.messages[3] as KoogMessage.User
-        assertThat(followUpMessage.content).isEqualTo("Implement.")
+        assertThat(followUpMessage.textContent()).isEqualTo("Implement.")
     }
 
     private fun buildExpectedInlineEditSystemPrompt(
@@ -467,38 +468,51 @@ class OpenAIRequestFactoryIntegrationTest : IntegrationTest() {
     }
 
     private fun normalize(messages: List<KoogMessage>): List<Map<String, Any?>> {
-        return messages.map { msg ->
+        return messages.flatMap { msg ->
             when (msg) {
-                is KoogMessage.System -> mapOf(
-                    "role" to "system",
-                    "content" to msg.content
+                is KoogMessage.System -> listOf(
+                    mapOf("role" to "system", "content" to msg.textContent())
                 )
 
-                is KoogMessage.User -> mapOf(
-                    "role" to "user",
-                    "content" to msg.content
-                )
+                is KoogMessage.User -> {
+                    val results = msg.parts.filterIsInstance<MessagePart.Tool.Result>()
+                    val text = msg.parts.filterIsInstance<MessagePart.Text>()
+                    buildList {
+                        if (text.isNotEmpty() || results.isEmpty()) {
+                            add(mapOf("role" to "user", "content" to msg.textContent()))
+                        }
+                        results.forEach {
+                            add(
+                                mapOf(
+                                    "role" to "tool_result",
+                                    "id" to it.id,
+                                    "tool" to it.tool,
+                                    "content" to it.output
+                                )
+                            )
+                        }
+                    }
+                }
 
-                is KoogMessage.Assistant -> mapOf(
-                    "role" to "assistant",
-                    "content" to msg.content
-                )
-
-                is KoogMessage.Tool.Call -> mapOf(
-                    "role" to "tool_call",
-                    "id" to msg.id,
-                    "tool" to msg.tool,
-                    "args" to msg.content
-                )
-
-                is KoogMessage.Tool.Result -> mapOf(
-                    "role" to "tool_result",
-                    "id" to msg.id,
-                    "tool" to msg.tool,
-                    "content" to msg.content
-                )
-
-                else -> mapOf("role" to "unknown")
+                is KoogMessage.Assistant -> {
+                    val calls = msg.parts.filterIsInstance<MessagePart.Tool.Call>()
+                    val text = msg.parts.filterIsInstance<MessagePart.Text>()
+                    buildList {
+                        if (text.isNotEmpty() || calls.isEmpty()) {
+                            add(mapOf("role" to "assistant", "content" to msg.textContent()))
+                        }
+                        calls.forEach {
+                            add(
+                                mapOf(
+                                    "role" to "tool_call",
+                                    "id" to it.id,
+                                    "tool" to it.tool,
+                                    "args" to it.args
+                                )
+                            )
+                        }
+                    }
+                }
             }
         }
     }

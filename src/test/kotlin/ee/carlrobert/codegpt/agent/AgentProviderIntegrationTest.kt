@@ -1,8 +1,12 @@
 package ee.carlrobert.codegpt.agent
 
 import ai.koog.agents.snapshot.feature.AgentCheckpointData
+import ai.koog.agents.core.agent.session.AdditionalInputs
+import ai.koog.utils.time.KoogClock
+import ai.koog.agents.snapshot.feature.GraphCheckpointProperties
 import ai.koog.agents.snapshot.providers.file.JVMFilePersistenceStorageProvider
 import ai.koog.prompt.message.Message
+import ai.koog.prompt.message.MessagePart
 import ai.koog.prompt.message.RequestMetaInfo
 import ai.koog.prompt.message.ResponseMetaInfo
 import ai.koog.serialization.JSONObject
@@ -56,8 +60,10 @@ class AgentProviderIntegrationTest : IntegrationTest() {
                 AgentCheckpointData(
                     checkpointId = resumeCheckpointId,
                     createdAt = Clock.System.now(),
+                    graphProperties = GraphCheckpointProperties(
                     nodePath = "$agentId/single_run/nodeExecuteTool",
-                    lastOutput = JSONObject(emptyMap()),
+                    lastOutput = JSONObject(emptyMap())
+                ),
                     messageHistory = listOf(
                         Message.User("My name is Carl", RequestMetaInfo.Empty),
                         Message.Assistant("ok", ResponseMetaInfo.Empty),
@@ -70,8 +76,10 @@ class AgentProviderIntegrationTest : IntegrationTest() {
                 AgentCheckpointData(
                     checkpointId = finishCheckpointId,
                     createdAt = Clock.System.now(),
+                    graphProperties = GraphCheckpointProperties(
                     nodePath = "$agentId/single_run/__finish__",
-                    lastOutput = JSONObject(emptyMap()),
+                    lastOutput = JSONObject(emptyMap())
+                ),
                     messageHistory = listOf(
                         Message.User("My name is Carl", RequestMetaInfo.Empty),
                         Message.Assistant("ok", ResponseMetaInfo.Empty),
@@ -114,7 +122,7 @@ class AgentProviderIntegrationTest : IntegrationTest() {
 
             assertThat(events.text.toString()).isEqualTo("Your name is Carl")
             assertThat(latestCheckpoint).isNotNull
-            assertThat(latestCheckpoint!!.messageHistory.filterIsInstance<Message.User>().map { it.content })
+            assertThat(latestCheckpoint!!.messageHistory.filterIsInstance<Message.User>().map { it.textContent() })
                 .contains("My name is Carl", "What's my name?")
         } finally {
             contentManager.removeSession(sessionId)
@@ -161,7 +169,7 @@ class AgentProviderIntegrationTest : IntegrationTest() {
             assertThat(events.text.toString()).isEqualTo("Your name is Carl")
             assertThat(session.seededMessageHistory).isNull()
             assertThat(latestCheckpoint).isNotNull
-            assertThat(latestCheckpoint!!.messageHistory.filterIsInstance<Message.User>().map { it.content })
+            assertThat(latestCheckpoint!!.messageHistory.filterIsInstance<Message.User>().map { it.textContent() })
                 .contains("My name is Carl", "What's my name?")
         } finally {
             contentManager.removeSession(sessionId)
@@ -557,16 +565,13 @@ class AgentProviderIntegrationTest : IntegrationTest() {
                 AgentCheckpointData(
                     checkpointId = checkpointId,
                     createdAt = Clock.System.now(),
+                    graphProperties = GraphCheckpointProperties(
                     nodePath = "$agentId/single_run/nodeExecuteTool",
-                    lastOutput = JSONObject(emptyMap()),
+                    lastOutput = JSONObject(emptyMap())
+                ),
                     messageHistory = listOf(
                         Message.User("Investigate with a subagent", RequestMetaInfo.Empty),
-                        Message.Tool.Call(
-                            id = "call_cancelled_task",
-                            tool = "Task",
-                            content = """{"subagent_type":"Explore","description":"Inspect code","prompt":"Find the bug"}""",
-                            metaInfo = ResponseMetaInfo.Empty
-                        )
+                        Message.Assistant(MessagePart.Tool.Call(id = "call_cancelled_task", tool = "Task", args = """{"subagent_type":"Explore","description":"Inspect code","prompt":"Find the bug"}"""), ResponseMetaInfo.Empty)
                     ),
                     version = 0
                 )

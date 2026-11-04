@@ -1,7 +1,9 @@
 package ee.carlrobert.codegpt.agent.history
 
 import ai.koog.agents.snapshot.feature.AgentCheckpointData
+import ai.koog.agents.snapshot.feature.GraphCheckpointProperties
 import ai.koog.prompt.message.Message
+import ai.koog.prompt.message.MessagePart
 import ai.koog.prompt.message.RequestMetaInfo
 import ai.koog.prompt.message.ResponseMetaInfo
 import ai.koog.serialization.JSONObject
@@ -43,18 +45,8 @@ class AgentCheckpointConversationMapperTest {
             listOf(
                 Message.User("Run the command", RequestMetaInfo.Empty),
                 Message.Assistant("Working on it", ResponseMetaInfo.Empty),
-                Message.Tool.Call(
-                    id = "tool-1",
-                    tool = "Bash",
-                    content = """{"command":"ls"}""",
-                    metaInfo = ResponseMetaInfo.Empty
-                ),
-                Message.Tool.Result(
-                    id = "tool-1",
-                    tool = "Bash",
-                    content = "file1.txt",
-                    metaInfo = RequestMetaInfo.Empty
-                )
+                Message.Assistant(MessagePart.Tool.Call(id = "tool-1", tool = "Bash", args = """{"command":"ls"}"""), ResponseMetaInfo.Empty),
+                Message.User(MessagePart.Tool.Result("tool-1", "Bash", "file1.txt"), RequestMetaInfo.Empty)
             )
         )
 
@@ -146,24 +138,9 @@ class AgentCheckpointConversationMapperTest {
         val checkpoint = checkpoint(
             listOf(
                 Message.User("Run the command", RequestMetaInfo.Empty),
-                Message.Tool.Call(
-                    id = "tool-1",
-                    tool = "Bash",
-                    content = """{"command":"ls"}""",
-                    metaInfo = ResponseMetaInfo.Empty
-                ),
-                Message.Tool.Result(
-                    id = "tool-1",
-                    tool = "Bash",
-                    content = "file1.txt",
-                    metaInfo = RequestMetaInfo.Empty
-                ),
-                Message.Tool.Result(
-                    id = "tool-1",
-                    tool = "Bash",
-                    content = "file2.txt",
-                    metaInfo = RequestMetaInfo.Empty
-                )
+                Message.Assistant(MessagePart.Tool.Call(id = "tool-1", tool = "Bash", args = """{"command":"ls"}"""), ResponseMetaInfo.Empty),
+                Message.User(MessagePart.Tool.Result("tool-1", "Bash", "file1.txt"), RequestMetaInfo.Empty),
+                Message.User(MessagePart.Tool.Result("tool-1", "Bash", "file2.txt"), RequestMetaInfo.Empty)
             )
         )
 
@@ -204,30 +181,10 @@ class AgentCheckpointConversationMapperTest {
         val checkpoint = checkpoint(
             listOf(
                 Message.User("Visible prompt", RequestMetaInfo.Empty),
-                Message.Tool.Call(
-                    id = "todo-1",
-                    tool = "TodoWrite",
-                    content = """{"todos":[{"content":"x","status":"pending"}]}""",
-                    metaInfo = ResponseMetaInfo.Empty
-                ),
-                Message.Tool.Result(
-                    id = "todo-1",
-                    tool = "TodoWrite",
-                    content = "ok",
-                    metaInfo = RequestMetaInfo.Empty
-                ),
-                Message.Tool.Call(
-                    id = "tool-1",
-                    tool = "Bash",
-                    content = """{"command":"ls"}""",
-                    metaInfo = ResponseMetaInfo.Empty
-                ),
-                Message.Tool.Result(
-                    id = "tool-1",
-                    tool = "Bash",
-                    content = "file1.txt",
-                    metaInfo = RequestMetaInfo.Empty
-                )
+                Message.Assistant(MessagePart.Tool.Call(id = "todo-1", tool = "TodoWrite", args = """{"todos":[{"content":"x","status":"pending"}]}"""), ResponseMetaInfo.Empty),
+                Message.User(MessagePart.Tool.Result("todo-1", "TodoWrite", "ok"), RequestMetaInfo.Empty),
+                Message.Assistant(MessagePart.Tool.Call(id = "tool-1", tool = "Bash", args = """{"command":"ls"}"""), ResponseMetaInfo.Empty),
+                Message.User(MessagePart.Tool.Result("tool-1", "Bash", "file1.txt"), RequestMetaInfo.Empty)
             )
         )
 
@@ -252,10 +209,12 @@ class AgentCheckpointConversationMapperTest {
         return AgentCheckpointData(
             checkpointId = "checkpoint-1",
             createdAt = Instant.parse("2026-02-04T00:00:00Z"),
-            nodePath = "agent/single_run/nodeExecuteTool",
-            lastOutput = JSONObject(emptyMap()),
             messageHistory = history,
-            version = 0
-        )
+                graphProperties = GraphCheckpointProperties(
+                    nodePath = "agent/single_run/nodeExecuteTool",
+                    lastOutput = JSONObject(emptyMap())
+                ),
+                version = 0L
+            )
     }
 }

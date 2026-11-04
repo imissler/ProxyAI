@@ -1,7 +1,9 @@
 package ee.carlrobert.codegpt.agent.history
 
 import ai.koog.agents.snapshot.feature.AgentCheckpointData
+import ai.koog.agents.snapshot.feature.GraphCheckpointProperties
 import ai.koog.prompt.message.Message
+import ai.koog.prompt.message.MessagePart
 import ai.koog.prompt.message.RequestMetaInfo
 import ai.koog.prompt.message.ResponseMetaInfo
 import ai.koog.serialization.JSONObject
@@ -19,20 +21,10 @@ class AgentCheckpointTurnSequencerTest {
         val history = listOf(
             Message.User("Prompt 1", RequestMetaInfo.Empty),
             Message.Assistant("Assistant 1", ResponseMetaInfo.Empty),
-            Message.Tool.Call(
-                id = "tool-1",
-                tool = "Bash",
-                content = """{"command":"ls"}""",
-                metaInfo = ResponseMetaInfo.Empty
-            ),
+            Message.Assistant(MessagePart.Tool.Call(id = "tool-1", tool = "Bash", args = """{"command":"ls"}"""), ResponseMetaInfo.Empty),
             Message.Assistant("Assistant 2", ResponseMetaInfo.Empty),
-            Message.Tool.Result(
-                id = "tool-1",
-                tool = "Bash",
-                content = "file.txt",
-                metaInfo = RequestMetaInfo.Empty
-            ),
-            Message.Reasoning(content = "Reasoning 1", metaInfo = ResponseMetaInfo.Empty),
+            Message.User(MessagePart.Tool.Result("tool-1", "Bash", "file.txt"), RequestMetaInfo.Empty),
+            Message.Assistant(MessagePart.Reasoning("Reasoning 1"), ResponseMetaInfo.Empty),
             Message.User("Prompt 2", RequestMetaInfo.Empty),
             Message.Assistant("Assistant 3", ResponseMetaInfo.Empty)
         )
@@ -73,30 +65,10 @@ class AgentCheckpointTurnSequencerTest {
             Message.User("I haven't created a todo list yet.", RequestMetaInfo.Empty),
             Message.Assistant("Synthetic response", ResponseMetaInfo.Empty),
             Message.User("Visible prompt 2", RequestMetaInfo.Empty),
-            Message.Tool.Call(
-                id = "todo-1",
-                tool = "TodoWrite",
-                content = """{"todos":[{"content":"x","status":"pending"}]}""",
-                metaInfo = ResponseMetaInfo.Empty
-            ),
-            Message.Tool.Result(
-                id = "todo-1",
-                tool = "TodoWrite",
-                content = "ok",
-                metaInfo = RequestMetaInfo.Empty
-            ),
-            Message.Tool.Call(
-                id = "tool-1",
-                tool = "Bash",
-                content = """{"command":"ls"}""",
-                metaInfo = ResponseMetaInfo.Empty
-            ),
-            Message.Tool.Result(
-                id = "tool-1",
-                tool = "Bash",
-                content = "file.txt",
-                metaInfo = RequestMetaInfo.Empty
-            ),
+            Message.Assistant(MessagePart.Tool.Call(id = "todo-1", tool = "TodoWrite", args = """{"todos":[{"content":"x","status":"pending"}]}"""), ResponseMetaInfo.Empty),
+            Message.User(MessagePart.Tool.Result("todo-1", "TodoWrite", "ok"), RequestMetaInfo.Empty),
+            Message.Assistant(MessagePart.Tool.Call(id = "tool-1", tool = "Bash", args = """{"command":"ls"}"""), ResponseMetaInfo.Empty),
+            Message.User(MessagePart.Tool.Result("tool-1", "Bash", "file.txt"), RequestMetaInfo.Empty),
             Message.Assistant("Visible response 2", ResponseMetaInfo.Empty)
         )
 
@@ -132,18 +104,8 @@ class AgentCheckpointTurnSequencerTest {
             Message.User("Hidden cacheable prompt", cacheableMetaInfo()),
             Message.Assistant("Hidden response", ResponseMetaInfo.Empty),
             Message.User("Visible prompt 2", RequestMetaInfo.Empty),
-            Message.Tool.Call(
-                id = "tool-1",
-                tool = "Bash",
-                content = """{"command":"ls"}""",
-                metaInfo = ResponseMetaInfo.Empty
-            ),
-            Message.Tool.Result(
-                id = "tool-1",
-                tool = "Bash",
-                content = "file.txt",
-                metaInfo = RequestMetaInfo.Empty
-            )
+            Message.Assistant(MessagePart.Tool.Call(id = "tool-1", tool = "Bash", args = """{"command":"ls"}"""), ResponseMetaInfo.Empty),
+            Message.User(MessagePart.Tool.Result("tool-1", "Bash", "file.txt"), RequestMetaInfo.Empty)
         )
 
         val actualTurns = AgentCheckpointTurnSequencer.toVisibleTurns(history, null)
@@ -151,10 +113,12 @@ class AgentCheckpointTurnSequencerTest {
             checkpoint = AgentCheckpointData(
                 checkpointId = "checkpoint-1",
                 createdAt = Instant.parse("2026-02-04T00:00:00Z"),
-                nodePath = "agent/single_run/nodeExecuteTool",
-                lastOutput = JSONObject(emptyMap()),
                 messageHistory = history,
-                version = 0
+                graphProperties = GraphCheckpointProperties(
+                    nodePath = "agent/single_run/nodeExecuteTool",
+                    lastOutput = JSONObject(emptyMap())
+                ),
+                version = 0L
             ),
             projectInstructions = null
         )
@@ -168,46 +132,16 @@ class AgentCheckpointTurnSequencerTest {
         val history = listOf(
             Message.User("Implement feature X", RequestMetaInfo.Empty),
             Message.Assistant("Starting implementation", ResponseMetaInfo.Empty),
-            Message.Tool.Call(
-                id = "bash-1",
-                tool = "Bash",
-                content = """{"command":"ls"}""",
-                metaInfo = ResponseMetaInfo.Empty
-            ),
-            Message.Tool.Result(
-                id = "bash-1",
-                tool = "Bash",
-                content = "file.txt",
-                metaInfo = RequestMetaInfo.Empty
-            ),
+            Message.Assistant(MessagePart.Tool.Call(id = "bash-1", tool = "Bash", args = """{"command":"ls"}"""), ResponseMetaInfo.Empty),
+            Message.User(MessagePart.Tool.Result("bash-1", "Bash", "file.txt"), RequestMetaInfo.Empty),
             Message.User(
                 "It seems that you haven't created a todo list yet. If the task on hand requires multiple steps then create a todo list to track your changes.",
                 RequestMetaInfo.Empty
             ),
-            Message.Tool.Call(
-                id = "todo-1",
-                tool = "TodoWrite",
-                content = """{"todos":[{"content":"x","status":"pending"}]}""",
-                metaInfo = ResponseMetaInfo.Empty
-            ),
-            Message.Tool.Result(
-                id = "todo-1",
-                tool = "TodoWrite",
-                content = "ok",
-                metaInfo = RequestMetaInfo.Empty
-            ),
-            Message.Tool.Call(
-                id = "read-1",
-                tool = "Read",
-                content = """{"path":"src/Main.kt"}""",
-                metaInfo = ResponseMetaInfo.Empty
-            ),
-            Message.Tool.Result(
-                id = "read-1",
-                tool = "Read",
-                content = "content",
-                metaInfo = RequestMetaInfo.Empty
-            ),
+            Message.Assistant(MessagePart.Tool.Call(id = "todo-1", tool = "TodoWrite", args = """{"todos":[{"content":"x","status":"pending"}]}"""), ResponseMetaInfo.Empty),
+            Message.User(MessagePart.Tool.Result("todo-1", "TodoWrite", "ok"), RequestMetaInfo.Empty),
+            Message.Assistant(MessagePart.Tool.Call(id = "read-1", tool = "Read", args = """{"path":"src/Main.kt"}"""), ResponseMetaInfo.Empty),
+            Message.User(MessagePart.Tool.Result("read-1", "Read", "content"), RequestMetaInfo.Empty),
             Message.Assistant("Done", ResponseMetaInfo.Empty)
         )
 

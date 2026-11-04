@@ -88,9 +88,9 @@ class CompletionRequestProviderTest : IntegrationTest() {
     private fun normalize(messages: List<KoogMessage>): List<Map<String, String>> {
         return messages.mapNotNull { msg ->
             when (msg) {
-                is KoogMessage.System -> mapOf("role" to "system", "content" to msg.content)
-                is KoogMessage.User -> mapOf("role" to "user", "content" to msg.content)
-                is KoogMessage.Assistant -> mapOf("role" to "assistant", "content" to msg.content)
+                is KoogMessage.System -> mapOf("role" to "system", "content" to msg.textContent())
+                is KoogMessage.User -> mapOf("role" to "user", "content" to msg.textContent())
+                is KoogMessage.Assistant -> mapOf("role" to "assistant", "content" to msg.textContent())
                 else -> null
             }
         }

@@ -20,13 +20,13 @@ class CodeCompletionPromptFactoryTest : TestCase() {
 
         assertThat(prompt.params.maxTokens).isEqualTo(128)
         assertThat(prompt.params.temperature).isEqualTo(0.0)
-        assertThat(systemMessage.content).contains("code completion assistant")
-        assertThat(userMessage.content).contains("<PREFIX>")
-        assertThat(userMessage.content).contains("</PREFIX>")
-        assertThat(userMessage.content).contains("<SUFFIX>")
-        assertThat(userMessage.content).contains("</SUFFIX>")
-        assertThat(userMessage.content).contains("fun sum(a: Int, b: Int) = ")
-        assertThat(userMessage.content).contains(" + c")
+        assertThat(systemMessage.textContent()).contains("code completion assistant")
+        assertThat(userMessage.textContent()).contains("<PREFIX>")
+        assertThat(userMessage.textContent()).contains("</PREFIX>")
+        assertThat(userMessage.textContent()).contains("<SUFFIX>")
+        assertThat(userMessage.textContent()).contains("</SUFFIX>")
+        assertThat(userMessage.textContent()).contains("fun sum(a: Int, b: Int) = ")
+        assertThat(userMessage.textContent()).contains(" + c")
     }
 
     fun testBuildTruncatesGitDiffAugmentedPrefixBackToPromptBudget() {

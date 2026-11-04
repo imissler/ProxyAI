@@ -2,6 +2,7 @@ package ee.carlrobert.codegpt.agent.strategy
 
 import ai.koog.prompt.llm.LLMProvider
 import ai.koog.prompt.message.Message
+import ai.koog.prompt.message.MessagePart
 import ai.koog.prompt.message.ResponseMetaInfo
 import ee.carlrobert.codegpt.agent.normalizeToolArgumentsJson
 import org.assertj.core.api.Assertions.assertThat
@@ -10,90 +11,65 @@ import kotlin.test.Test
 class SingleRunStrategyProviderTest {
 
     @Test
-    fun `extract assistant output prefers assistant text when available`() {
-        val responses = listOf(
-            Message.Reasoning(content = "Reasoning text", metaInfo = ResponseMetaInfo.Empty),
-            Message.Assistant("Final answer", ResponseMetaInfo.Empty)
+    fun `extract assistant output combines reasoning and assistant text`() {
+        val response = Message.Assistant(
+            listOf(
+                MessagePart.Reasoning("Reasoning text"),
+                MessagePart.Text("Final answer")
+            ),
+            ResponseMetaInfo.Empty
         )
 
-        val actual = extractAssistantOutput(responses)
+        val actual = extractAssistantOutput(response)
 
-        assertThat(actual).isEqualTo("Final answer")
+        assertThat(actual).isEqualTo("<think>Reasoning text</think>\nFinal answer")
+    }
+
+    @Test
+    fun `extract assistant output returns assistant text when there is no reasoning`() {
+        val response = Message.Assistant("Final answer", ResponseMetaInfo.Empty)
+
+        assertThat(extractAssistantOutput(response)).isEqualTo("Final answer")
     }
 
     @Test
     fun `extract assistant output falls back to reasoning when assistant text is blank`() {
-        val responses = listOf(
-            Message.Reasoning(content = "Reasoning text", metaInfo = ResponseMetaInfo.Empty),
-            Message.Assistant("", ResponseMetaInfo.Empty)
+        val response = Message.Assistant(
+            listOf(
+                MessagePart.Reasoning("Reasoning text"),
+                MessagePart.Text("")
+            ),
+            ResponseMetaInfo.Empty
         )
 
-        val actual = extractAssistantOutput(responses)
+        val actual = extractAssistantOutput(response)
 
         assertThat(actual).isEqualTo("<think>Reasoning text</think>")
     }
 
     @Test
-    fun `appendable responses keeps reasoning fallback for non google when assistant is blank`() {
-        val responses = listOf(
-            Message.Reasoning(content = "Reasoning text", metaInfo = ResponseMetaInfo.Empty),
-            Message.Assistant("", ResponseMetaInfo.Empty)
+    fun `appendable responses keeps responses untouched for every provider`() {
+        val response = Message.Assistant(
+            listOf(
+                MessagePart.Reasoning("Reasoning text"),
+                MessagePart.Text("I will inspect the file."),
+                MessagePart.Tool.Call(
+                    id = "tool-1",
+                    tool = "Read",
+                    args = """{"path":"build.gradle.kts"}"""
+                )
+            ),
+            ResponseMetaInfo.Empty
         )
 
-        val actual = appendableResponses(responses, LLMProvider.OpenAI)
+        listOf(LLMProvider.OpenAI, LLMProvider.Google).forEach { provider ->
+            val actual = appendableResponses(listOf(response), provider)
 
-        assertThat(actual)
-            .singleElement()
-            .isInstanceOf(Message.Reasoning::class.java)
-    }
-
-    @Test
-    fun `appendable responses removes reasoning for non google when assistant has text`() {
-        val responses = listOf(
-            Message.Reasoning(content = "Reasoning text", metaInfo = ResponseMetaInfo.Empty),
-            Message.Assistant("Final answer", ResponseMetaInfo.Empty)
-        )
-
-        val actual = appendableResponses(responses, LLMProvider.OpenAI)
-
-        assertThat(actual)
-            .singleElement()
-            .isInstanceOf(Message.Assistant::class.java)
-    }
-
-    @Test
-    fun `appendable responses keeps reasoning for google`() {
-        val responses = listOf(
-            Message.Reasoning(content = "Reasoning text", metaInfo = ResponseMetaInfo.Empty),
-            Message.Assistant("Final answer", ResponseMetaInfo.Empty)
-        )
-
-        val actual = appendableResponses(responses, LLMProvider.Google)
-
-        assertThat(actual.map { it::class.simpleName })
-            .containsExactly("Assistant", "Reasoning")
-    }
-
-    @Test
-    fun `appendable responses drops assistant text for google tool turns`() {
-        val responses = listOf(
-            Message.Reasoning(content = "Reasoning text", metaInfo = ResponseMetaInfo.Empty),
-            Message.Assistant("I will inspect the file.", ResponseMetaInfo.Empty),
-            Message.Tool.Call(
-                id = "tool-1",
-                tool = "Read",
-                content = """{"path":"build.gradle.kts"}""",
-                metaInfo = ResponseMetaInfo.Empty
-            )
-        )
-
-        val actual = appendableResponses(responses, LLMProvider.Google)
-        val toolCall = actual.filterIsInstance<Message.Tool.Call>().single()
-
-        assertThat(actual.map { it::class.simpleName })
-            .containsExactly("Reasoning", "Call")
-        assertThat(toolCall.tool).isEqualTo("Read")
-        assertThat(toolCall.content).isEqualTo("""{"path":"build.gradle.kts"}""")
+            assertThat(actual).containsExactly(response)
+            val toolCall = actual.single().parts.filterIsInstance<MessagePart.Tool.Call>().single()
+            assertThat(toolCall.tool).isEqualTo("Read")
+            assertThat(toolCall.args).isEqualTo("""{"path":"build.gradle.kts"}""")
+        }
     }
 
     @Test

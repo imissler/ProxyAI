@@ -58,10 +58,7 @@ class CustomOpenAIResponsesSerializationIntegrationTest : IntegrationTest() {
 
             val response = client.execute(prompt, model, emptyList())
 
-            assertThat(response)
-                .singleElement()
-                .extracting("content")
-                .isEqualTo("Hello with flattened params")
+            assertThat(response.textContent()).isEqualTo("Hello with flattened params")
         }
     }
 

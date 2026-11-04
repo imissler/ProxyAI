@@ -101,9 +101,9 @@ class RetryingPromptExecutorRetryabilityTest {
             val events = RecordingAgentEvents()
             val executor = retryingExecutor(FailingPromptExecutor(failuresBeforeSuccess = 1), events)
 
-            val responses = executor.execute(testPrompt(), testModel(), emptyList())
+            val response = executor.execute(testPrompt(), testModel(), emptyList())
 
-            assertThat(responses.map { it.content }).containsExactly("ok")
+            assertThat(response.textContent()).isEqualTo("ok")
             assertThat(events.events).containsExactly(
                 "retry:2/5",
                 "retrySucceeded"
@@ -160,12 +160,12 @@ class RetryingPromptExecutorRetryabilityTest {
             prompt: Prompt,
             model: LLModel,
             tools: List<ToolDescriptor>
-        ): List<Message.Response> {
+        ): Message.Assistant {
             executeCalls++
             if (executeCalls <= failuresBeforeSuccess) {
                 throw IOException("Operation timed out")
             }
-            return listOf(Message.Assistant("ok", ResponseMetaInfo.Empty))
+            return Message.Assistant("ok", ResponseMetaInfo.Empty)
         }
 
         override suspend fun moderate(prompt: Prompt, model: LLModel): ModerationResult {

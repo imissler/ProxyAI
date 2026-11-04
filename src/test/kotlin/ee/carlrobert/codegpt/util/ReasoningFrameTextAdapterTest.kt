@@ -19,7 +19,7 @@ class ReasoningFrameTextAdapterTest {
             adapter.consume(
                 StreamFrame.ReasoningComplete(
                     id = "1",
-                    text = listOf("step 1 step 2"),
+                    content = listOf("step 1 step 2"),
                     summary = emptyList(),
                     encrypted = null,
                     index = 0
@@ -36,7 +36,7 @@ class ReasoningFrameTextAdapterTest {
             adapter.consume(
                 StreamFrame.ReasoningComplete(
                     id = "1",
-                    text = listOf("full reasoning"),
+                    content = listOf("full reasoning"),
                     summary = emptyList(),
                     encrypted = null,
                     index = 1
@@ -56,7 +56,7 @@ class ReasoningFrameTextAdapterTest {
             adapter.consume(
                 StreamFrame.ReasoningComplete(
                     id = "1",
-                    text = listOf("delta"),
+                    content = listOf("delta"),
                     summary = emptyList(),
                     encrypted = null,
                     index = null

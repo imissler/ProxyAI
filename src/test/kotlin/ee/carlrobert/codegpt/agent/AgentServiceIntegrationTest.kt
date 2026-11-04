@@ -9,6 +9,9 @@ import ai.koog.agents.core.feature.pipeline.AIAgentPipeline
 import ai.koog.agents.core.tools.ToolDescriptor
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.agents.snapshot.feature.AgentCheckpointData
+import ai.koog.agents.core.agent.session.AdditionalInputs
+import ai.koog.utils.time.KoogClock
+import ai.koog.agents.snapshot.feature.GraphCheckpointProperties
 import ai.koog.agents.snapshot.feature.isTombstone
 import ai.koog.agents.snapshot.feature.tombstoneCheckpoint
 import ai.koog.agents.snapshot.providers.file.JVMFilePersistenceStorageProvider
@@ -208,7 +211,7 @@ class AgentServiceIntegrationTest : IntegrationTest() {
         assertThat(factory.createdServices.single().historySeenByInput["What's my name?"])
             .contains("My name is Carl")
         assertThat(latestCheckpoint).isNotNull
-        assertThat(latestCheckpoint!!.messageHistory.filterIsInstance<Message.User>().map { it.content })
+        assertThat(latestCheckpoint!!.messageHistory.filterIsInstance<Message.User>().map { it.textContent() })
             .contains("My name is Carl", "What's my name?")
     }
 
@@ -223,8 +226,10 @@ class AgentServiceIntegrationTest : IntegrationTest() {
                 AgentCheckpointData(
                     checkpointId = firstCheckpointId,
                     createdAt = Clock.System.now(),
+                    graphProperties = GraphCheckpointProperties(
                     nodePath = "$agentId/single_run/nodeExecuteTool",
-                    lastOutput = JSONObject(emptyMap()),
+                    lastOutput = JSONObject(emptyMap())
+                ),
                     messageHistory = listOf(
                         Message.User("My name is Carl", RequestMetaInfo.Empty),
                         Message.Assistant("ok", ResponseMetaInfo.Empty),
@@ -237,8 +242,10 @@ class AgentServiceIntegrationTest : IntegrationTest() {
                 AgentCheckpointData(
                     checkpointId = finishCheckpointId,
                     createdAt = Clock.System.now(),
+                    graphProperties = GraphCheckpointProperties(
                     nodePath = "$agentId/single_run/__finish__",
-                    lastOutput = JSONObject(emptyMap()),
+                    lastOutput = JSONObject(emptyMap())
+                ),
                     messageHistory = listOf(
                         Message.User("My name is Carl", RequestMetaInfo.Empty),
                         Message.Assistant("ok", ResponseMetaInfo.Empty),
@@ -273,7 +280,7 @@ class AgentServiceIntegrationTest : IntegrationTest() {
         assertThat(factory.service.runIdsByInput["What's my name?"]).containsExactly(agentId)
         assertThat(factory.service.historySeenByInput["What's my name?"]).contains("My name is Carl")
         assertThat(latestCheckpoint).isNotNull
-        assertThat(latestCheckpoint!!.messageHistory.filterIsInstance<Message.User>().map { it.content })
+        assertThat(latestCheckpoint!!.messageHistory.filterIsInstance<Message.User>().map { it.textContent() })
             .contains("My name is Carl", "What's my name?")
     }
 
@@ -346,8 +353,10 @@ class AgentServiceIntegrationTest : IntegrationTest() {
                 AgentCheckpointData(
                     checkpointId = checkpointId,
                     createdAt = Clock.System.now(),
+                    graphProperties = GraphCheckpointProperties(
                     nodePath = "$runtimeAgentId/single_run/nodeExecuteTool",
-                    lastOutput = JSONObject(emptyMap()),
+                    lastOutput = JSONObject(emptyMap())
+                ),
                     messageHistory = listOf(
                         Message.User("hello", RequestMetaInfo.Empty),
                         Message.Assistant("world", ResponseMetaInfo.Empty),
@@ -672,7 +681,7 @@ private class FakeManagedAgentService(
         id: String?,
         additionalToolRegistry: ToolRegistry,
         agentConfig: AIAgentConfig,
-        clock: Clock
+        clock: KoogClock
     ): FakeManagedAgent {
         val actualId = id ?: UUID.randomUUID().toString()
         val agent = FakeManagedAgent(actualId, agentConfig, this, checkpointStorage)
@@ -686,7 +695,7 @@ private class FakeManagedAgentService(
         id: String?,
         additionalToolRegistry: ToolRegistry,
         agentConfig: AIAgentConfig,
-        clock: Clock
+        clock: KoogClock
     ): String {
         return createAgent(id, additionalToolRegistry, agentConfig, clock).run(agentInput)
     }
@@ -731,7 +740,7 @@ private class ControlledCancellationManagedAgentService(
         id: String?,
         additionalToolRegistry: ToolRegistry,
         agentConfig: AIAgentConfig,
-        clock: Clock
+        clock: KoogClock
     ): ControlledCancellationManagedAgent {
         val actualId = id ?: UUID.randomUUID().toString()
         val agent =
@@ -746,7 +755,7 @@ private class ControlledCancellationManagedAgentService(
         id: String?,
         additionalToolRegistry: ToolRegistry,
         agentConfig: AIAgentConfig,
-        clock: Clock
+        clock: KoogClock
     ): String {
         return createAgent(id, additionalToolRegistry, agentConfig, clock).run(agentInput)
     }
@@ -792,7 +801,7 @@ private class TombstoneManagedAgentService(
         id: String?,
         additionalToolRegistry: ToolRegistry,
         agentConfig: AIAgentConfig,
-        clock: Clock
+        clock: KoogClock
     ): TombstoneManagedAgent {
         val actualId = id ?: UUID.randomUUID().toString()
         val agent = TombstoneManagedAgent(actualId, agentConfig, this, checkpointStorage)
@@ -805,7 +814,7 @@ private class TombstoneManagedAgentService(
         id: String?,
         additionalToolRegistry: ToolRegistry,
         agentConfig: AIAgentConfig,
-        clock: Clock
+        clock: KoogClock
     ): String {
         return createAgent(id, additionalToolRegistry, agentConfig, clock).run(agentInput)
     }
@@ -849,7 +858,7 @@ private class DelayedCompletionManagedAgentService(
         id: String?,
         additionalToolRegistry: ToolRegistry,
         agentConfig: AIAgentConfig,
-        clock: Clock
+        clock: KoogClock
     ): DelayedCompletionManagedAgent {
         val actualId = id ?: UUID.randomUUID().toString()
         val agent = DelayedCompletionManagedAgent(actualId, agentConfig, this, checkpointStorage)
@@ -863,7 +872,7 @@ private class DelayedCompletionManagedAgentService(
         id: String?,
         additionalToolRegistry: ToolRegistry,
         agentConfig: AIAgentConfig,
-        clock: Clock
+        clock: KoogClock
     ): String {
         return createAgent(id, additionalToolRegistry, agentConfig, clock).run(agentInput)
     }
@@ -900,7 +909,7 @@ private class ControlledCancellationManagedAgent(
         val history = continuation?.messageHistory ?: latest?.messageHistory.orEmpty()
         owner.historySeenByInput[agentInput.text] = history
             .filterIsInstance<Message.User>()
-            .map { it.content }
+            .map { it.textContent() }
 
         val updatedHistory = buildList {
             addAll(history)
@@ -912,8 +921,10 @@ private class ControlledCancellationManagedAgent(
             AgentCheckpointData(
                 checkpointId = UUID.randomUUID().toString(),
                 createdAt = Clock.System.now(),
-                nodePath = "$id/single_run/nodeExecuteTool",
-                lastOutput = JSONObject(emptyMap()),
+                graphProperties = GraphCheckpointProperties(
+                    nodePath = "$id/single_run/nodeExecuteTool",
+                    lastOutput = JSONObject(emptyMap())
+                ),
                 messageHistory = updatedHistory,
                 version = (latest?.version ?: -1) + 1
             )
@@ -936,7 +947,7 @@ private class ControlledCancellationManagedAgent(
 
     override fun createSession(sessionId: String?): AIAgentRunSession<MessageWithContext, String, out AIAgentContext> {
         return object : AIAgentRunSession<MessageWithContext, String, AIAgentContext> {
-            override suspend fun run(input: MessageWithContext): String {
+            override suspend fun run(input: MessageWithContext, sessionInputs: AdditionalInputs): String {
                 return this@ControlledCancellationManagedAgent.run(input, sessionId)
             }
 
@@ -970,13 +981,15 @@ private class TombstoneManagedAgent(
         val history = continuation?.messageHistory ?: latest?.messageHistory.orEmpty()
         owner.historySeenByInput[agentInput.text] = history
             .filterIsInstance<Message.User>()
-            .map { it.content }
+            .map { it.textContent() }
 
         val checkpoint = AgentCheckpointData(
             checkpointId = UUID.randomUUID().toString(),
             createdAt = Clock.System.now(),
-            nodePath = "$runId/single_run/nodeExecuteTool",
-            lastOutput = JSONObject(emptyMap()),
+            graphProperties = GraphCheckpointProperties(
+                    nodePath = "$runId/single_run/nodeExecuteTool",
+                    lastOutput = JSONObject(emptyMap())
+                ),
             messageHistory = buildList {
                 addAll(history)
                 add(Message.User(agentInput.text, RequestMetaInfo.Empty))
@@ -995,7 +1008,7 @@ private class TombstoneManagedAgent(
 
     override fun createSession(sessionId: String?): AIAgentRunSession<MessageWithContext, String, out AIAgentContext> {
         return object : AIAgentRunSession<MessageWithContext, String, AIAgentContext> {
-            override suspend fun run(input: MessageWithContext): String {
+            override suspend fun run(input: MessageWithContext, sessionInputs: AdditionalInputs): String {
                 return this@TombstoneManagedAgent.run(input, sessionId)
             }
 
@@ -1026,7 +1039,7 @@ private class DelayedCompletionManagedAgent(
         val history = continuation?.messageHistory ?: latest?.messageHistory.orEmpty()
         owner.historySeenByInput[agentInput.text] = history
             .filterIsInstance<Message.User>()
-            .map { it.content }
+            .map { it.textContent() }
 
         val updatedHistory = buildList {
             addAll(history)
@@ -1038,8 +1051,10 @@ private class DelayedCompletionManagedAgent(
             AgentCheckpointData(
                 checkpointId = UUID.randomUUID().toString(),
                 createdAt = Clock.System.now(),
-                nodePath = "$id/single_run/nodeExecuteTool",
-                lastOutput = JSONObject(emptyMap()),
+                graphProperties = GraphCheckpointProperties(
+                    nodePath = "$id/single_run/nodeExecuteTool",
+                    lastOutput = JSONObject(emptyMap())
+                ),
                 messageHistory = updatedHistory,
                 version = (latest?.version ?: -1) + 1
             )
@@ -1055,7 +1070,7 @@ private class DelayedCompletionManagedAgent(
 
     override fun createSession(sessionId: String?): AIAgentRunSession<MessageWithContext, String, out AIAgentContext> {
         return object : AIAgentRunSession<MessageWithContext, String, AIAgentContext> {
-            override suspend fun run(input: MessageWithContext): String {
+            override suspend fun run(input: MessageWithContext, sessionInputs: AdditionalInputs): String {
                 return this@DelayedCompletionManagedAgent.run(input, sessionId)
             }
 
@@ -1085,12 +1100,14 @@ private class FakeManagedAgent(
         val history = continuation?.messageHistory ?: latest?.messageHistory.orEmpty()
         owner.historySeenByInput[agentInput.text] = history
             .filterIsInstance<Message.User>()
-            .map { it.content }
+            .map { it.textContent() }
         val checkpoint = AgentCheckpointData(
             checkpointId = UUID.randomUUID().toString(),
             createdAt = Clock.System.now(),
-            nodePath = "$id/single_run/nodeExecuteTool",
-            lastOutput = JSONObject(emptyMap()),
+            graphProperties = GraphCheckpointProperties(
+                    nodePath = "$id/single_run/nodeExecuteTool",
+                    lastOutput = JSONObject(emptyMap())
+                ),
             messageHistory = buildList {
                 addAll(history)
                 add(Message.User(agentInput.text, RequestMetaInfo.Empty))
@@ -1105,7 +1122,7 @@ private class FakeManagedAgent(
 
     override fun createSession(sessionId: String?): AIAgentRunSession<MessageWithContext, String, out AIAgentContext> {
         return object : AIAgentRunSession<MessageWithContext, String, AIAgentContext> {
-            override suspend fun run(input: MessageWithContext): String {
+            override suspend fun run(input: MessageWithContext, sessionInputs: AdditionalInputs): String {
                 return this@FakeManagedAgent.run(input, sessionId)
             }
 
@@ -1127,7 +1144,7 @@ private object NoopPromptExecutor : PromptExecutor() {
         prompt: Prompt,
         model: LLModel,
         tools: List<ToolDescriptor>
-    ): List<Message.Response> {
+    ): Message.Assistant {
         throw UnsupportedOperationException("NoopPromptExecutor should not be used in tests")
     }
 

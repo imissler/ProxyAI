@@ -1,8 +1,12 @@
 package ee.carlrobert.codegpt.agent.history
 
 import ai.koog.agents.snapshot.feature.AgentCheckpointData
+import ai.koog.agents.snapshot.feature.GraphCheckpointProperties
+import ai.koog.serialization.JSONObject
+import ai.koog.serialization.JSONPrimitive
 import ai.koog.agents.snapshot.providers.file.JVMFilePersistenceStorageProvider
 import ai.koog.prompt.message.Message
+import ai.koog.prompt.message.MessagePart
 import ai.koog.prompt.message.RequestMetaInfo
 import ai.koog.prompt.message.ResponseMetaInfo
 import com.intellij.openapi.components.service
@@ -201,12 +205,7 @@ class AgentCheckpointHistoryServiceTest : IntegrationTest() {
                     nodePath = "$agentId/single_run/nodeExecuteTool",
                     history = listOf(
                         Message.User("Investigate issue", RequestMetaInfo.Empty),
-                        Message.Tool.Call(
-                            id = "call-1",
-                            tool = "Task",
-                            content = """{"prompt":"inspect"}""",
-                            metaInfo = ResponseMetaInfo.Empty
-                        )
+                        Message.Assistant(MessagePart.Tool.Call(id = "call-1", tool = "Task", args = """{"prompt":"inspect"}"""), ResponseMetaInfo.Empty)
                     )
                 )
             )
@@ -231,12 +230,7 @@ class AgentCheckpointHistoryServiceTest : IntegrationTest() {
                     nodePath = "$agentId/single_run/nodeExecuteTool",
                     history = listOf(
                         Message.User("Please debug the crash", RequestMetaInfo.Empty),
-                        Message.Tool.Call(
-                            id = "tool-1",
-                            tool = "TodoWrite",
-                            content = """{"title":"Fix crash flow","todos":[]}""",
-                            metaInfo = ResponseMetaInfo.Empty
-                        ),
+                        Message.Assistant(MessagePart.Tool.Call(id = "tool-1", tool = "TodoWrite", args = """{"title":"Fix crash flow","todos":[]}"""), ResponseMetaInfo.Empty),
                         Message.User("Also handle retries", RequestMetaInfo.Empty)
                     )
                 )
@@ -261,12 +255,7 @@ class AgentCheckpointHistoryServiceTest : IntegrationTest() {
                     nodePath = "$agentId/single_run/nodeExecuteTool",
                     history = listOf(
                         Message.User("First request", RequestMetaInfo.Empty),
-                        Message.Tool.Call(
-                            id = "tool-2",
-                            tool = "TodoWrite",
-                            content = """{"title":" ","todos":[]}""",
-                            metaInfo = ResponseMetaInfo.Empty
-                        ),
+                        Message.Assistant(MessagePart.Tool.Call(id = "tool-2", tool = "TodoWrite", args = """{"title":" ","todos":[]}"""), ResponseMetaInfo.Empty),
                         Message.User("Latest request", RequestMetaInfo.Empty)
                     )
                 )
@@ -326,7 +315,7 @@ class AgentCheckpointHistoryServiceTest : IntegrationTest() {
         tombstone: Boolean = false
     ): AgentCheckpointData {
         val properties = if (tombstone) {
-            JsonObject(mapOf("tombstone" to JsonPrimitive(true)))
+            JSONObject(mapOf("tombstone" to JSONPrimitive(true)))
         } else {
             null
         }
@@ -334,12 +323,11 @@ class AgentCheckpointHistoryServiceTest : IntegrationTest() {
         return AgentCheckpointData(
             checkpointId = checkpointId,
             createdAt = createdAt,
-            nodePath = nodePath,
-            lastInput = null,
-            lastOutput = buildJsonObject {
-                put("history_size", JsonPrimitive(history.size))
-            },
             messageHistory = history,
+            graphProperties = GraphCheckpointProperties(
+                nodePath = nodePath,
+                lastOutput = JSONObject(mapOf("history_size" to JSONPrimitive(history.size)))
+            ),
             version = 0L,
             properties = properties
         )
