@@ -11,6 +11,7 @@ import ai.koog.prompt.message.RequestMetaInfo
 import ai.koog.prompt.message.ResponseMetaInfo
 import ai.koog.serialization.JSONObject
 import com.intellij.openapi.components.service
+import com.intellij.openapi.util.Disposer
 import ee.carlrobert.codegpt.agent.history.AgentCheckpointHistoryService
 import ee.carlrobert.codegpt.agent.history.CheckpointRef
 import ee.carlrobert.codegpt.conversations.Conversation
@@ -21,6 +22,7 @@ import ee.carlrobert.codegpt.settings.models.ModelCatalog
 import ee.carlrobert.codegpt.settings.models.ModelSettings
 import ee.carlrobert.codegpt.settings.service.FeatureType
 import ee.carlrobert.codegpt.settings.service.ServiceType
+import ee.carlrobert.codegpt.settings.service.anthropic.AnthropicSettings
 import ee.carlrobert.codegpt.settings.service.custom.CustomServiceSettingsState
 import ee.carlrobert.codegpt.settings.service.custom.CustomServicesSettings
 import ee.carlrobert.codegpt.toolwindow.agent.AgentSession
@@ -302,6 +304,14 @@ class AgentProviderIntegrationTest : IntegrationTest() {
             "claude-opus-5-5",
             ServiceType.ANTHROPIC
         )
+        // With reasoning summaries enabled (the default) the client sends an adaptive `thinking`
+        // block with `display: summarized`. Turn it off to check that nothing else is sent.
+        val anthropicState = service<AnthropicSettings>().state
+        val previousShowReasoningSummary = anthropicState.isShowReasoningSummary
+        anthropicState.isShowReasoningSummary = false
+        Disposer.register(testRootDisposable) {
+            anthropicState.isShowReasoningSummary = previousShowReasoningSummary
+        }
         val fixture = createReadFixture("Anthropic adaptive fixture")
         expectAnthropic { request ->
             assertThat(request.body["model"]).isEqualTo("claude-opus-5-5")
