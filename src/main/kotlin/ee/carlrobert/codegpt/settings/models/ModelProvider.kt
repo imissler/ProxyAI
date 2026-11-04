@@ -189,7 +189,7 @@ private fun defaultModelDisplayName(modelId: String): String {
         // Mistral
 //        Devstral2.id -> "Devstral 2"
 // //        MistralAIModels.Chat.DevstralMedium.id -> "Devstral Medium"
-// //        MistralAIModels.Chat.Codestral.id -> "Codestral"
+        ModelCatalog.CODESTRAL_LATEST -> "Codestral"
 
         // Inception
         Mercury2.id, MERCURY2 -> "Mercury 2"
@@ -623,7 +623,17 @@ private class MistralModelProvider : ModelProvider {
 
             in CHAT_FEATURES, FeatureType.AUTO_APPLY -> chatModels.map { defaultModel(it) }
 
-//             FeatureType.CODE_COMPLETION -> listOf(defaultModel(MistralAIModels.Chat.Codestral))
+            FeatureType.CODE_COMPLETION -> listOf(
+                defaultModel(
+                    virtualModel(
+                        LLMProvider.MistralAI,
+                        ModelCatalog.CODESTRAL_LATEST,
+                        listOf(LLMCapability.Completion),
+                        contextLength = 256_000,
+                        maxOutputTokens = 4_096,
+                    )
+                )
+            )
 
             else -> emptyList()
         }
