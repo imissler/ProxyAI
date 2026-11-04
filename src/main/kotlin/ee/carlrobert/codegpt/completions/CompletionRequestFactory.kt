@@ -4,6 +4,7 @@ import ai.koog.prompt.Prompt
 import ai.koog.prompt.dsl.PromptBuilder
 import ai.koog.prompt.dsl.prompt
 import ai.koog.prompt.message.AttachmentContent
+import ai.koog.prompt.message.MessagePart
 // import ai.koog.prompt.message.ContentPart
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
@@ -103,7 +104,7 @@ abstract class BaseRequestFactory : CompletionRequestFactory {
                             ?.function
                             ?.name
                             ?: "unknown-function"
-                        toolResult(callId, toolName, result)
+                        toolResult(MessagePart.Tool.Result(id = callId, tool = toolName, output = result))
                     }
                     if (!callParameters.retry && !currentMessage.response.isNullOrBlank()) {
                         assistant(currentMessage.response)
@@ -159,11 +160,13 @@ abstract class BaseRequestFactory : CompletionRequestFactory {
             }
             message.toolCalls?.forEach { toolCall ->
                 toolCall(
-                    toolCall.id,
-                    toolCall.function.name ?: "unknown-function",
-                    toolCall.function.arguments
-                        ?.takeIf { it.isNotBlank() }
-                        ?: "{}"
+                    MessagePart.Tool.Call(
+                        id = toolCall.id,
+                        tool = toolCall.function.name ?: "unknown-function",
+                        args = toolCall.function.arguments
+                            ?.takeIf { it.isNotBlank() }
+                            ?: "{}"
+                    )
                 )
             }
             if (includeToolResults) {
@@ -173,7 +176,7 @@ abstract class BaseRequestFactory : CompletionRequestFactory {
                         ?.function
                         ?.name
                         ?: "unknown-function"
-                    toolResult(callId, toolName, result)
+                    toolResult(MessagePart.Tool.Result(id = callId, tool = toolName, output = result))
                 }
             }
         } else if (!message.response.isNullOrBlank()) {

@@ -188,7 +188,12 @@ object ProxyAIAgent {
                 }
 
                 onNodeExecutionCompleted { ctx ->
-                    val output = (ctx.output as? List<*>) ?: emptyList<Any?>()
+                    // Koog 1.2 nodes emit a single Message.Assistant; older ones emitted a list.
+                    val output: List<*> = when (val raw = ctx.output) {
+                        is List<*> -> raw
+                        null -> emptyList<Any?>()
+                        else -> listOf(raw)
+                    }
                     if (stream) {
                         if (!streamedReasoningForCurrentNode) {
                             output.filterIsInstance<Message.Assistant>().forEach { msg ->
