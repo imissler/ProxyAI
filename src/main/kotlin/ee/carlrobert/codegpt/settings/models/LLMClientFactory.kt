@@ -35,7 +35,14 @@ object LLMClientFactory {
 
     fun supportedServiceTypes(): Set<ServiceType> = supportedServices
 
-    fun createClient(serviceType: ServiceType, featureType: FeatureType): LLMClient {
+    fun createClient(
+        serviceType: ServiceType,
+        featureType: FeatureType,
+        modelSelection: ModelSelection? = null
+    ): LLMClient {
+        require(modelSelection == null || modelSelection.provider == serviceType) {
+            "Model selection provider does not match client provider"
+        }
         return when (serviceType) {
             ServiceType.PROXYAI -> {
                 val apiKey = getCredential(CredentialKey.CodeGptApiKey) ?: ""
@@ -149,8 +156,18 @@ object LLMClientFactory {
             }
 
             ServiceType.CUSTOM_OPENAI -> {
-                val state =
-                    service<CustomServicesSettings>().customServiceStateForFeatureType(featureType)
+                val settings = service<CustomServicesSettings>()
+                // A pinned subagent must use its own endpoint and credentials, independently
+                // of the model selected for the main Agent feature.
+                val state = if (modelSelection == null) {
+                    settings.customServiceStateForFeatureType(featureType)
+                } else {
+                    val selectedServiceId = requireNotNull(modelSelection.serviceId) {
+                        "Custom OpenAI model selection has no service id"
+                    }
+                    settings.state.services.find { it.id == selectedServiceId }
+                        ?: error("Unable to find custom service with id '$selectedServiceId'.")
+                }
                 val serviceId = state.id ?: error("No custom service configured")
                 val apiKey = getCredential(CredentialKey.CustomServiceApiKeyById(serviceId))
                     ?: ""

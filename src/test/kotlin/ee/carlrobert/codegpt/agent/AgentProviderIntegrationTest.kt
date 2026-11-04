@@ -18,11 +18,13 @@ import ee.carlrobert.codegpt.conversations.Conversation
 import ee.carlrobert.codegpt.credentials.CredentialsStore.CredentialKey.*
 import ee.carlrobert.codegpt.credentials.CredentialsStore.setCredential
 import ee.carlrobert.codegpt.agent.clients.shouldStreamCustomOpenAI
+import ee.carlrobert.codegpt.settings.hooks.HookManager
 import ee.carlrobert.codegpt.settings.models.ModelCatalog
 import ee.carlrobert.codegpt.settings.models.ModelSettings
 import ee.carlrobert.codegpt.settings.service.FeatureType
 import ee.carlrobert.codegpt.settings.service.ServiceType
 import ee.carlrobert.codegpt.settings.service.anthropic.AnthropicSettings
+import ee.carlrobert.codegpt.settings.service.ollama.OllamaSettings
 import ee.carlrobert.codegpt.settings.service.custom.CustomServiceSettingsState
 import ee.carlrobert.codegpt.settings.service.custom.CustomServicesSettings
 import ee.carlrobert.codegpt.toolwindow.agent.AgentSession
@@ -48,6 +50,94 @@ import kotlin.io.path.writeText
 import kotlin.time.Clock
 
 class AgentProviderIntegrationTest : IntegrationTest() {
+
+    fun testPinnedCustomSubagentsRunWhileParentUsesOllama() {
+        val customService = configureCustomOpenAIService()
+        val modelSettings = service<ModelSettings>()
+        val selection = modelSettings.getAvailableModels(FeatureType.AGENT)
+            .single { it.serviceId == customService.id }
+        service<OllamaSettings>().state.availableModels.add("parent-ollama-test")
+        modelSettings.setModel(FeatureType.AGENT, "parent-ollama-test", ServiceType.OLLAMA)
+
+        val agents = listOf(
+            AgentFactory.createManualAgent(
+                provider = ServiceType.CUSTOM_OPENAI,
+                modelSelection = selection,
+                project = project,
+                sessionId = "manual-pinned-test",
+                title = "RepoReaderPC",
+                behavior = "Reply briefly",
+                toolNames = emptySet(),
+                hookManager = HookManager(project)
+            ),
+            AgentFactory.createAgent(
+                agentType = AgentType.EXPLORE,
+                provider = ServiceType.CUSTOM_OPENAI,
+                modelSelection = selection,
+                project = project,
+                sessionId = "builtin-pinned-test",
+                toolOverrides = emptySet(),
+                hookManager = HookManager(project)
+            )
+        )
+        for (agent in agents) {
+            expectCustomOpenAI(BasicHttpExchange { request ->
+                assertThat(request.uri.path).isEqualTo("/v1/chat/completions")
+                assertThat(request.body["model"]).isEqualTo("custom-agent-model")
+                ResponseEntity(customOpenAiResponse("Reply from PC"))
+            })
+            runBlocking {
+                try {
+                    assertThat(agent.run("Say hello")).isEqualTo("Reply from PC")
+                } finally {
+                    agent.close()
+                }
+            }
+        }
+        assertThat(modelSettings.getModelSelectionForFeature(FeatureType.AGENT).provider)
+            .isEqualTo(ServiceType.OLLAMA)
+    }
+
+    fun testPinnedCustomSubagentUsesOwnProfileInsteadOfParentCustomProfile() {
+        val parent = configureCustomOpenAIService()
+        val child = CustomServiceSettingsState().apply {
+            name = "PC profile"
+            chatCompletionSettings.url = System.getProperty("customOpenAI.baseUrl") +
+                "/pc/v1/chat/completions"
+            chatCompletionSettings.body.clear()
+            chatCompletionSettings.body["model"] = "pc-model"
+            chatCompletionSettings.body["stream"] = false
+        }
+        service<CustomServicesSettings>().state.services.add(child)
+        setCredential(CustomServiceApiKeyById(requireNotNull(child.id)), "PC_TEST_KEY")
+        val modelSettings = service<ModelSettings>()
+        val selection = modelSettings.getAvailableModels(FeatureType.AGENT)
+            .single { it.serviceId == child.id }
+        expectCustomOpenAI(BasicHttpExchange { request ->
+            assertThat(request.uri.path).isEqualTo("/pc/v1/chat/completions")
+            assertThat(request.body["model"]).isEqualTo("pc-model")
+            ResponseEntity(customOpenAiResponse("Reply from child profile"))
+        })
+        val agent = AgentFactory.createManualAgent(
+            provider = ServiceType.CUSTOM_OPENAI,
+            modelSelection = selection,
+            project = project,
+            sessionId = "separate-profile-test",
+            title = "RepoReaderPC",
+            behavior = "Reply briefly",
+            toolNames = emptySet(),
+            hookManager = HookManager(project)
+        )
+        runBlocking {
+            try {
+                assertThat(agent.run("Say hello")).isEqualTo("Reply from child profile")
+            } finally {
+                agent.close()
+            }
+        }
+        assertThat(modelSettings.getModelSelectionForFeature(FeatureType.AGENT).serviceId)
+            .isEqualTo(parent.id)
+    }
 
     fun testSubmitMessageContinuesArchivedThreadThroughRealRuntime() {
         configureCustomOpenAIService()

@@ -85,7 +85,7 @@ object AgentFactory {
             onAgentToolCallCompleted,
             onCreditsAvailable
         )
-        val executor = createExecutor(provider, events)
+        val executor = createExecutor(provider, events, modelSelection = modelSelection)
         val agentModel = modelSelection?.llmModel ?: service<ModelSettings>().getAgentModel()
         return when (agentType) {
             AgentType.GENERAL_PURPOSE -> createGeneralPurposeAgent(
@@ -138,7 +138,7 @@ object AgentFactory {
             onAgentToolCallCompleted,
             onCreditsAvailable
         )
-        val executor = createExecutor(provider)
+        val executor = createExecutor(provider, modelSelection = modelSelection)
         val agentModel = modelSelection?.llmModel ?: service<ModelSettings>().getAgentModel()
 
         val selected = ToolName.parse(toolNames)
@@ -189,9 +189,10 @@ object AgentFactory {
     fun createExecutor(
         provider: ServiceType,
         events: AgentEvents? = null,
-        featureType: FeatureType = FeatureType.AGENT
+        featureType: FeatureType = FeatureType.AGENT,
+        modelSelection: ModelSelection? = null
     ): PromptExecutor {
-        val llmClient = LLMClientFactory.createClient(provider, featureType)
+        val llmClient = LLMClientFactory.createClient(provider, featureType, modelSelection)
         val policy = RetryingPromptExecutor.RetryPolicy(
             maxAttempts = 5,
             initialDelay = 1.seconds,

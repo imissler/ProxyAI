@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Subagents pinned to a Custom OpenAI model now use their own service profile (endpoint and credentials) instead of the global Agent profile, regardless of the parent agent's provider
+
 ## [3.8.2-261] - 2026-05-27
 
 ### Added
