@@ -1,9 +1,10 @@
 package ee.carlrobert.codegpt.agent.strategy
 
-import ai.koog.agents.core.dsl.extension.Concept
-import ai.koog.agents.core.dsl.extension.FactType
+import ai.koog.agents.core.agent.session.AIAgentLLMWriteSession
 import ai.koog.agents.core.dsl.extension.HistoryCompressionStrategy
 import ai.koog.prompt.Prompt
+import ai.koog.prompt.message.Message
+import ai.koog.prompt.message.MessagePart
 import ai.koog.prompt.tokenizer.PromptTokenizer
 import ee.carlrobert.codegpt.settings.configuration.AutoCompactSettings
 
@@ -36,45 +37,56 @@ fun buildHistoryTooBigPredicate(maxPromptTokens: Long): (Prompt, PromptTokenizer
         tokenCount.toLong() >= maxPromptTokens
     }
 
-val CODE_AGENT_COMPRESSION = HistoryCompressionStrategy.FactRetrieval(
-    Concept(
-        "project-structure",
-        "What is the structure of this project?",
-        FactType.MULTIPLE
-    ),
-    Concept(
-        "project-dependencies",
-        "What are the dependencies of this project?",
-        FactType.MULTIPLE
-    ),
-    Concept(
-        "important-achievements",
-        "What has been achieved during the execution of this current agent?",
-        FactType.MULTIPLE
-    ),
-    Concept(
-        "agent-goal",
-        "What is the primary goal or task the agent is trying to accomplish in this session?",
-        FactType.SINGLE
-    ),
-    Concept(
-        "tool-interaction-summary",
-        "Summarize the sequence of tools used, the reason for using each tool, and the key results or outcomes obtained.",
-        FactType.MULTIPLE
-    ),
-    Concept(
-        "key-findings-and-data",
-        "What are the most critical pieces of information, data points, code snippets, or insights discovered or generated during the process, beyond project structure or dependencies?",
-        FactType.MULTIPLE
-    ),
-    Concept(
-        "current-status-and-conclusions",
-        "Describe the current progress status towards the overall goal and summarize any intermediate conclusions reached so far.",
-        FactType.SINGLE
-    ),
-    Concept(
-        "pending-tasks-and-issues",
-        "What are the immediate next steps planned or required? Are there any unresolved questions, issues, decisions to be made, or blockers encountered?",
-        FactType.MULTIPLE
-    )
-)
+/** Number of most recent messages that stay verbatim when the history is compacted. */
+const val COMPACT_KEEP_LAST_MESSAGES = 4
+
+/**
+ * Splits [messages] into the part to summarize and the recent tail that stays verbatim.
+ *
+ * The tail holds at least [keepLast] messages. Its start moves back so that a tool result is never
+ * separated from the tool call that produced it. The head is empty when there is nothing besides
+ * system messages and the first user message to summarize.
+ */
+internal fun splitForCompaction(
+    messages: List<Message>,
+    keepLast: Int
+): Pair<List<Message>, List<Message>> {
+    var tailStart = (messages.size - keepLast).coerceAtLeast(0)
+    while (tailStart > 0 && messages[tailStart].isToolResultMessage()) {
+        tailStart--
+    }
+    val head = messages.subList(0, tailStart)
+    val summarizable = head.count { it !is Message.System }
+    // The first user message is always kept by Koog, so a single one is nothing to summarize.
+    if (summarizable <= 1) {
+        return messages to emptyList()
+    }
+    return head to messages.subList(tailStart, messages.size)
+}
+
+private fun Message.isToolResultMessage(): Boolean =
+    this is Message.User && parts.any { it is MessagePart.Tool.Result }
+
+/**
+ * Summarizes the older history in a single model request and keeps the latest messages verbatim.
+ *
+ * Replaces the fact-retrieval strategy, which sent one request per concept with the whole
+ * history attached. That is very slow on local models such as llama.cpp, where every request
+ * has to process the full prompt again.
+ */
+object SummarizeOlderHistoryStrategy : HistoryCompressionStrategy() {
+    override suspend fun compress(
+        llmSession: AIAgentLLMWriteSession,
+        memoryMessages: List<Message>
+    ) {
+        val original = llmSession.prompt.messages
+        val (head, tail) = splitForCompaction(original, COMPACT_KEEP_LAST_MESSAGES)
+
+        llmSession.prompt = llmSession.prompt.withMessages { head }
+        val tldr = compressPromptIntoTLDR(llmSession)
+        val compressed = composeMessageHistory(head, tldr, memoryMessages) + tail
+        llmSession.prompt = llmSession.prompt.withMessages { compressed }
+    }
+}
+
+val CODE_AGENT_COMPRESSION: HistoryCompressionStrategy = SummarizeOlderHistoryStrategy
