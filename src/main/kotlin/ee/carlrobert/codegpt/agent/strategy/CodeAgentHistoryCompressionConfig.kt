@@ -41,11 +41,11 @@ fun buildHistoryTooBigPredicate(maxPromptTokens: Long): (Prompt, PromptTokenizer
 const val COMPACT_KEEP_LAST_MESSAGES = 4
 
 /**
- * Splits [messages] into the part to summarize and the recent tail that stays verbatim.
+ * Splits [messages] into the part to summarise and the recent tail that stays verbatim.
  *
  * The tail holds at least [keepLast] messages. Its start moves back so that a tool result is never
  * separated from the tool call that produced it. The head is empty when there is nothing besides
- * system messages and the first user message to summarize.
+ * system messages and the first user message to summarise.
  */
 internal fun splitForCompaction(
     messages: List<Message>,
@@ -68,7 +68,7 @@ private fun Message.isToolResultMessage(): Boolean =
     this is Message.User && parts.any { it is MessagePart.Tool.Result }
 
 /**
- * Summarizes the older history in a single model request and keeps the latest messages verbatim.
+ * Summarises the older history in a single model request and keeps the latest messages verbatim.
  *
  * Replaces the fact-retrieval strategy, which sent one request per concept with the whole
  * history attached. That is very slow on local models such as llama.cpp, where every request
