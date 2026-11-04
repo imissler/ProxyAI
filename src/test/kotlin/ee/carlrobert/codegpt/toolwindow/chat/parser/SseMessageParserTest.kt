@@ -286,4 +286,16 @@ class SseMessageParserStreamTest {
         val codeEndSegments = segments.filterIsInstance<CodeEnd>()
         assertThat(codeEndSegments).hasSize(1)
     }
+
+    @Test
+    fun shouldNotEmitCodeAgainWhenClosingFenceAndNewlineArriveInSeparateChunks() {
+        val parser = SseMessageParser()
+        val chunks = listOf("Committed:\n", "```text:build.yml\nci: bump\n", "```", "\nDone!")
+
+        val segments = chunks.flatMap { parser.parse(it) }
+
+        assertThat(segments.filterIsInstance<CodeEnd>()).hasSize(1)
+        val firstEnd = segments.indexOfFirst { it is CodeEnd }
+        assertThat(segments.drop(firstEnd + 1).filterIsInstance<Code>()).isEmpty()
+    }
 }

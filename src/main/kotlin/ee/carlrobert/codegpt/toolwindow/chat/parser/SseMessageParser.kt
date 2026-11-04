@@ -24,13 +24,18 @@ class SseMessageParser : MessageParser {
     private var parserState: ParserState = ParserState.Outside
     private val buffer = StringBuilder()
 
+    // True once a closing fence still waiting for its newline was already reported as Code + CodeEnd.
+    private var closingFenceReported = false
+
     fun clear() {
         parserState = ParserState.Outside
         buffer.clear()
+        closingFenceReported = false
     }
 
     fun startNewVisualSection() {
         buffer.clear()
+        closingFenceReported = false
         parserState = when (val state = parserState) {
             is ParserState.Outside -> ParserState.Outside
             is ParserState.CodeHeaderWaiting -> state.copy(content = "")
@@ -144,15 +149,21 @@ class SseMessageParser : MessageParser {
 
         return when {
             isCodeFenceLine(line, state.indentation) -> {
-                if (state.content.isNotEmpty()) {
-                    segments.add(Code(state.content, state.header.language, state.header.filePath))
+                if (!closingFenceReported) {
+                    if (state.content.isNotEmpty()) {
+                        segments.add(
+                            Code(state.content, state.header.language, state.header.filePath)
+                        )
+                    }
+                    segments.add(CodeEnd(""))
                 }
-                segments.add(CodeEnd(""))
+                closingFenceReported = false
                 parserState = ParserState.Outside
                 true
             }
 
             isSearchStartLine(line) -> {
+                closingFenceReported = false
                 // Emit accumulated code content before transitioning
                 if (state.content.isNotEmpty()) {
                     segments.add(Code(state.content, state.header.language, state.header.filePath))
@@ -163,6 +174,7 @@ class SseMessageParser : MessageParser {
             }
 
             else -> {
+                closingFenceReported = false
                 val newContent =
                     if (state.content.isEmpty()) line else state.content + NEWLINE + line
                 parserState = ParserState.InCode(state.header, newContent, state.indentation)
@@ -299,7 +311,10 @@ class SseMessageParser : MessageParser {
             is ParserState.InCode -> {
                 val segments = mutableListOf<Segment>()
 
-                if (isCodeFenceLine(buffer.toString(), state.indentation)) {
+                if (closingFenceReported) {
+                    // Already reported; the fence line is still waiting for its newline.
+                } else if (isCodeFenceLine(buffer.toString(), state.indentation)) {
+                    closingFenceReported = true
                     if (state.content.isNotBlank()) {
                         segments.add(
                             Code(state.content, state.header.language, state.header.filePath)
