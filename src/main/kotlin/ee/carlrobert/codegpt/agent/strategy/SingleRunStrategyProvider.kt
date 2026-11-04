@@ -57,6 +57,7 @@ data class HistoryCompressionConfig(
 )
 
 internal const val SINGLE_RUN_NODE_CALL_LLM = "call_llm"
+internal const val SINGLE_RUN_NODE_START = "__start__"
 
 internal class SingleRunStrategyProvider : AgentRunStrategyProvider {
     @OptIn(ExperimentalAtomicApi::class)

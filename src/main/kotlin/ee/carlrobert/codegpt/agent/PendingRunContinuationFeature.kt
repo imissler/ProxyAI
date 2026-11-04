@@ -13,7 +13,7 @@ import ai.koog.prompt.message.Message
 import ai.koog.serialization.JSONElement
 import ai.koog.serialization.JSONObject
 import ai.koog.serialization.typeToken
-import ee.carlrobert.codegpt.agent.strategy.SINGLE_RUN_NODE_CALL_LLM
+import ee.carlrobert.codegpt.agent.strategy.SINGLE_RUN_NODE_START
 import java.util.concurrent.ConcurrentHashMap
 
 internal data class PendingRunContinuation(
@@ -51,7 +51,9 @@ internal object PendingRunContinuationFeature :
                     tools = toolNames,
                     storage = JSONObject(emptyMap()),
                     agentIterations = 0,
-                    nodePath = "${event.context.agentId}/single_run/$SINGLE_RUN_NODE_CALL_LLM",
+                    // Koog resumes at the node *after* nodePath and decodes lastOutput as that node's output,
+                    // so point at the start node (its output is the run input) to continue with call_llm.
+                    nodePath = "${event.context.agentId}/single_run/$SINGLE_RUN_NODE_START",
                     lastOutput = serializedInput,
                     rollbackStrategy = RollbackStrategy.MessageHistoryOnly
                 )
