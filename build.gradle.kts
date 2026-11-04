@@ -59,10 +59,14 @@ changelog {
 
 // The IDE ships kotlinx-coroutines. A bundled copy clashes with it ("CoroutineExceptionHandlerImpl
 // not a subtype"), and Koog 1.2 pulls it in transitively through many artifacts.
-configurations.runtimeClasspath {
-    exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")
-    exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core-jvm")
-    exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-jdk8")
+// The same applies to the test runtime, which would otherwise load the plain coroutines library
+// instead of the platform's patched one (NoSuchMethodError runBlockingWithParallelismCompensation).
+listOf(configurations.runtimeClasspath, configurations.testRuntimeClasspath).forEach { config ->
+    config {
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core-jvm")
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-jdk8")
+    }
 }
 
 dependencies {
@@ -81,6 +85,12 @@ dependencies {
             bundledPlugin("org.jetbrains.kotlin")
         }
         bundledPlugin("Git4Idea")
+        bundledPlugin("intellij.structureView.plugin")
+        bundledPlugin("intellij.todo.plugin")
+        bundledPlugin("intellij.testRunner.plugin")
+        bundledPlugin("intellij.structuralSearch.plugin")
+        bundledPlugin("intellij.libraries.misc.plugin")
+        bundledPlugin("com.intellij.modules.jcef")
 
         // VCS modules extracted in 2026.2+
         bundledModule("intellij.platform.vcs.dvcs")
@@ -109,6 +119,10 @@ dependencies {
     implementation(libs.acp.sdk) {
         exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")
         exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core-jvm")
+        // The platform bundles its own (newer) copy; the old 0.3.x transitive one shadows it on
+        // the test classpath and breaks the IDE kernel (NoSuchMethodError PersistentMap.putting).
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-collections-immutable")
+        exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-collections-immutable-jvm")
     }
 
     implementation(libs.flexmark.all) {
