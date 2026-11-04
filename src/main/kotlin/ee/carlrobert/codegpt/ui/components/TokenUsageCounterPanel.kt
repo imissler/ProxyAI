@@ -1,7 +1,6 @@
 package ee.carlrobert.codegpt.ui.components
 
 import ai.koog.prompt.llm.LLModel
-import com.intellij.icons.AllIcons
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
@@ -59,8 +58,6 @@ class TokenUsageCounterPanel(
         border = JBUI.Borders.empty(5, 7)
         isVisible = false
         if (onCompactRequested != null) {
-            icon = AllIcons.Actions.Collapseall
-            iconTextGap = JBUI.scale(4)
             cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
             addMouseListener(object : MouseAdapter() {
                 override fun mouseClicked(e: MouseEvent) {
@@ -121,10 +118,10 @@ class TokenUsageCounterPanel(
 
     private fun updateColorAndText(usedPromptTokens: Long, model: LLModel?) {
         val effectiveCapacity = (
-            lastReportedSizeTokens
-                ?: model?.let { computeBudget(it).inputBudget }
-                ?: return
-            ).coerceAtLeast(1L)
+                lastReportedSizeTokens
+                    ?: model?.let { computeBudget(it).inputBudget }
+                    ?: return
+                ).coerceAtLeast(1L)
         val percentageUsed =
             ((usedPromptTokens.coerceAtLeast(0).toDouble() / effectiveCapacity.toDouble()) * 100.0)
                 .coerceIn(0.0, 100.0)
