@@ -43,7 +43,11 @@ class PsiStructureProvider {
                 val future = ReadAction.nonBlocking<Set<ClassStructure>> {
                     val classStructureSet = mutableSetOf<ClassStructure>()
                     val processedPsiFiles = mutableSetOf<PsiFile?>()
-                    val psiFileDepthQueue = PsiFileDepthQueue(physicalPsiFiles, analyzeDepth)
+                    val validPsiFiles = physicalPsiFiles.filter { it.isValid }
+                    if (validPsiFiles.isEmpty()) {
+                        return@nonBlocking emptySet()
+                    }
+                    val psiFileDepthQueue = PsiFileDepthQueue(validPsiFiles, analyzeDepth)
 
                     while (true) {
                         coroutineContext.ensureActive()
@@ -54,12 +58,14 @@ class PsiStructureProvider {
                             processedPsiFiles.contains(psiFile) -> Unit
 
                             kotlinFileAnalyzerAvailable && psiFile is KtFile -> {
-                                classStructureSet.addAll(
-                                    KotlinFileAnalyzer(
-                                        psiFileQueue = psiFileDepthQueue,
-                                        ktFile = psiFile,
-                                    ).analyze()
-                                )
+                                if (psiFile.isValid) {
+                                    classStructureSet.addAll(
+                                        KotlinFileAnalyzer(
+                                            psiFileQueue = psiFileDepthQueue,
+                                            ktFile = psiFile,
+                                        ).analyze()
+                                    )
+                                }
                                 processedPsiFiles.add(psiFile)
                             }
 
