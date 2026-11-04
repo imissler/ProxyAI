@@ -18,6 +18,7 @@ import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.time.format.DateTimeFormatter
 import javax.swing.JButton
+import javax.swing.JLabel
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
 import kotlin.math.max
@@ -190,6 +191,7 @@ class ChatHistoryItemPanel(
             font = JBFont.regular().deriveFont(12f)
             foreground = getPreviewColor()
             maximumSize = Dimension(Int.MAX_VALUE, preferredSize.height * 2)
+            allowShrinking()
         }
     }
 
@@ -208,6 +210,7 @@ class ChatHistoryItemPanel(
                     .applyToComponent {
                         font = JBFont.regular().deriveFont(11f)
                         foreground = getMetadataColor()
+                        allowShrinking()
                     }
                     .align(AlignX.LEFT)
                     .resizableColumn()
@@ -236,7 +239,16 @@ class ChatHistoryItemPanel(
         return JBLabel(getConversationDisplayTitle()).apply {
             font = JBFont.label().deriveFont(14f).asBold()
             foreground = UIUtil.getLabelForeground()
+            allowShrinking()
         }
+    }
+
+    /**
+     * Lets a label become narrower than its text so Swing ellipses it ("...") instead of the
+     * row growing wider than the list and being clipped at the right edge.
+     */
+    private fun JLabel.allowShrinking() {
+        minimumSize = Dimension(0, preferredSize.height)
     }
 
     private fun getPreviewColor(): Color {

@@ -9,17 +9,43 @@ import com.intellij.util.ui.components.BorderLayoutPanel
 import ee.carlrobert.codegpt.CodeGPTBundle
 import ee.carlrobert.codegpt.conversations.Conversation
 import java.awt.BorderLayout
+import java.awt.Dimension
 import java.awt.Rectangle
 import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
 import java.util.*
 import javax.swing.BoxLayout
 import javax.swing.JPanel
+import javax.swing.Scrollable
 import javax.swing.ScrollPaneConstants
 
 class ChatHistoryListPanel : BorderLayoutPanel() {
 
-    private val itemsPanel = JPanel()
+    private companion object {
+        const val LIST_HORIZONTAL_INSET = 2
+    }
+
+    // Tracks the viewport width so long titles/previews are clipped inside the (inset) list
+    // instead of making the items wider than the visible area.
+    private val itemsPanel = object : JPanel(), Scrollable {
+        override fun getPreferredScrollableViewportSize(): Dimension = preferredSize
+
+        override fun getScrollableUnitIncrement(
+            visibleRect: Rectangle,
+            orientation: Int,
+            direction: Int
+        ): Int = JBUI.scale(16)
+
+        override fun getScrollableBlockIncrement(
+            visibleRect: Rectangle,
+            orientation: Int,
+            direction: Int
+        ): Int = visibleRect.height
+
+        override fun getScrollableTracksViewportWidth(): Boolean = true
+
+        override fun getScrollableTracksViewportHeight(): Boolean = false
+    }
     private var scrollPane = JBScrollPane(itemsPanel)
     private var conversations = listOf<Conversation>()
     private var selectedConversation: Conversation? = null
@@ -81,9 +107,12 @@ class ChatHistoryListPanel : BorderLayoutPanel() {
         scrollPane.apply {
             horizontalScrollBarPolicy = ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER
             verticalScrollBarPolicy = ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED
-            border = null
+            // Inset the list horizontally, matching the agent history list. The scroll pane stays
+            // transparent so the inset strips show the surrounding panel, not the list color.
+            border = JBUI.Borders.empty(0, LIST_HORIZONTAL_INSET)
             viewportBorder = null
-            background = UIUtil.getListBackground()
+            isOpaque = false
+            viewport.isOpaque = false
         }
         addToCenter(scrollPane)
     }

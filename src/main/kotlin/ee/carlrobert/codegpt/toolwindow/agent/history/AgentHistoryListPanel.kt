@@ -30,6 +30,7 @@ class AgentHistoryListPanel(
     companion object {
         val TIMESTAMP_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d, h:mm a")
         private const val MIN_VISIBLE_ROWS = 2
+        private const val LIST_HORIZONTAL_INSET = 8
     }
 
     var onOpen: ((AgentHistoryThreadSummary) -> Unit)? = null
@@ -53,7 +54,10 @@ class AgentHistoryListPanel(
     private val listScrollPane = JBScrollPane(historyList).apply {
         horizontalScrollBarPolicy = ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER
         verticalScrollBarPolicy = ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED
-        border = null
+        // Inset the list so it lines up with the visible edges of the search field above it.
+        border = JBUI.Borders.empty(0, LIST_HORIZONTAL_INSET)
+        // Keep the inset strip transparent so it shows the surrounding panel, not the list color.
+        isOpaque = false
         viewport.background = UIUtil.getListBackground()
     }
     private val emptyPanel = BorderLayoutPanel().apply {
