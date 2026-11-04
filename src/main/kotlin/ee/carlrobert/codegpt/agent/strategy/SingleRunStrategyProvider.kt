@@ -57,7 +57,8 @@ data class HistoryCompressionConfig(
 )
 
 internal const val SINGLE_RUN_NODE_CALL_LLM = "call_llm"
-internal const val SINGLE_RUN_NODE_START = "__start__"
+/** Pass-through node that run continuations resume after; see PendingRunContinuationFeature. */
+internal const val SINGLE_RUN_NODE_INIT = "init"
 
 internal class SingleRunStrategyProvider : AgentRunStrategyProvider {
     @OptIn(ExperimentalAtomicApi::class)
@@ -73,6 +74,7 @@ internal class SingleRunStrategyProvider : AgentRunStrategyProvider {
     ): AIAgentGraphStrategy<MessageWithContext, String> =
         strategy<MessageWithContext, String>("single_run") {
             val planCreated = AtomicBoolean(false)
+            val nodeInit by node<MessageWithContext, MessageWithContext>(SINGLE_RUN_NODE_INIT) { it }
             val nodeCallLLM by node<MessageWithContext, ai.koog.prompt.message.Message.Assistant>(
                 SINGLE_RUN_NODE_CALL_LLM
             ) { message ->
@@ -177,7 +179,8 @@ internal class SingleRunStrategyProvider : AgentRunStrategyProvider {
                 }
             }
 
-            edge(nodeStart forwardTo nodeCallLLM)
+            edge(nodeStart forwardTo nodeInit)
+            edge(nodeInit forwardTo nodeCallLLM)
             edge(nodeCallLLM forwardTo nodeExecuteTool onToolCalls { true })
             edge(nodeCallLLM forwardTo nodeFinish onSingleAssistantResponse { true })
             edge(nodeExecuteTool forwardTo nodeSendToolResult onCondition {
