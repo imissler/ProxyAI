@@ -572,15 +572,11 @@ class AgentToolWindowTabPanel(
                         this@AgentToolWindowTabPanel
                     )
 
-                    val renderedInOrder = if (canRenderInOrder) {
-                        renderRecoveredTurnInOrder(
-                            responseBody,
-                            recoveredTurns[index].events,
-                            fileChangeReconstructor
-                        )
-                    } else {
-                        false
-                    }
+                    val renderedInOrder = canRenderInOrder && renderRecoveredTurnInOrder(
+                        responseBody,
+                        recoveredTurns[index].events,
+                        fileChangeReconstructor
+                    )
 
                     if (!renderedInOrder) {
                         addRecoveredToolCards(responseBody, message, fileChangeReconstructor)

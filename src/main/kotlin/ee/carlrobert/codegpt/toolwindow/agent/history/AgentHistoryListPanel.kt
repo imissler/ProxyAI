@@ -56,7 +56,7 @@ class AgentHistoryListPanel(
         verticalScrollBarPolicy = ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED
         // Inset the list so it lines up with the visible edges of the search field above it.
         border = JBUI.Borders.empty(0, LIST_HORIZONTAL_INSET)
-        // Keep the inset strip transparent so it shows the surrounding panel, not the list color.
+        // Keep the inset strip transparent so it shows the surrounding panel, not the list colour.
         isOpaque = false
         viewport.background = UIUtil.getListBackground()
     }

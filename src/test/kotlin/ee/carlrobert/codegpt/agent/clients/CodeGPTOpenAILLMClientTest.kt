@@ -28,7 +28,7 @@ class CodeGPTOpenAILLMClientTest {
     private lateinit var server: HttpServer
     private val requests = CopyOnWriteArrayList<JsonObject>()
 
-    // No Thinking capability, like the catalog's OpenAI models.
+    // No Thinking capability, like the catalogue's OpenAI models.
     private val model = LLModel(
         provider = LLMProvider.OpenAI,
         id = "gpt-5.4",

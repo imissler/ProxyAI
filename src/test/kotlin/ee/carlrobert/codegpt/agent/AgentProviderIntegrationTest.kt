@@ -1382,7 +1382,7 @@ class AgentProviderIntegrationTest : IntegrationTest() {
         fixture: ReadFixture
     ) {
         val input = request.body["input"] as? List<*> ?: error("Expected responses input list")
-        val items = input.mapNotNull { it as? Map<*, *> }
+        val items = input.filterIsInstance<Map<*, *>>()
 
         assertThat(items.any { item ->
             item["type"] == "function_call" &&
@@ -1400,7 +1400,7 @@ class AgentProviderIntegrationTest : IntegrationTest() {
     private fun hasDanglingToolCallBeforeUser(request: RequestEntity): Boolean {
         val messages = request.body["messages"] as? List<*> ?: return false
         val pendingToolCallIds = LinkedHashSet<String>()
-        messages.mapNotNull { it as? Map<*, *> }.forEach { message ->
+        messages.filterIsInstance<Map<*, *>>().forEach { message ->
             when (message["role"]) {
                 "assistant" -> {
                     if (pendingToolCallIds.isNotEmpty()) {
@@ -1408,7 +1408,7 @@ class AgentProviderIntegrationTest : IntegrationTest() {
                     }
                     val toolCalls = message["tool_calls"] as? List<*> ?: emptyList<Any>()
                     toolCalls
-                        .mapNotNull { it as? Map<*, *> }
+                        .filterIsInstance<Map<*, *>>()
                         .mapNotNullTo(pendingToolCallIds) { it["id"] as? String }
                 }
 

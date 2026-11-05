@@ -10,6 +10,7 @@ import ee.carlrobert.codegpt.psistructure.models.ClassStructure
 import kotlinx.coroutines.*
 import org.jetbrains.kotlin.psi.KtFile
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Duration.Companion.milliseconds
 
 class PsiStructureProvider {
 
@@ -83,7 +84,7 @@ class PsiStructureProvider {
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                delay(DELAY_RESTART_READ_ACTION)
+                delay(DELAY_RESTART_READ_ACTION.milliseconds)
             }
         }
 

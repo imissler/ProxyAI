@@ -30,7 +30,7 @@ internal class PendingRunContinuationConfig : FeatureConfig() {
 internal object PendingRunContinuationFeature :
     AIAgentGraphFeature<PendingRunContinuationConfig, Unit> {
 
-    override val key: AIAgentStorageKey<Unit> = AIAgentStorageKey<Unit>("proxyai-pending-run-continuation", typeToken<Unit>())
+    override val key: AIAgentStorageKey<Unit> = AIAgentStorageKey("proxyai-pending-run-continuation", typeToken<Unit>())
 
     override fun createInitialConfig(agentConfig: AIAgentConfig): PendingRunContinuationConfig {
         return PendingRunContinuationConfig()

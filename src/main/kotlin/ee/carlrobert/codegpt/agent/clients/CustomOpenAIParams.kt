@@ -429,7 +429,7 @@ public open class CustomOpenAIParams(
         topK, repetitionPenalty, minP,
         topA, transforms, models, route,
     ).fold(0) { acc, element ->
-        31 * acc + (element?.hashCode() ?: 0)
+        31 * acc + element.hashCode()
     }
 
     override fun toString(): String = buildString {

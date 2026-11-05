@@ -3,7 +3,6 @@ package ee.carlrobert.codegpt.agent
 import ai.koog.agents.core.agent.AIAgentService
 import ai.koog.agents.core.agent.GraphAIAgentService
 import ai.koog.agents.core.agent.config.AIAgentConfig
-import ai.koog.agents.core.agent.context.RollbackStrategy
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.agents.features.eventHandler.feature.handleEvents
 import ai.koog.agents.features.tokenizer.feature.MessageTokenizer
@@ -25,8 +24,8 @@ import ee.carlrobert.codegpt.agent.strategy.CODE_AGENT_COMPRESSION
 import ee.carlrobert.codegpt.agent.strategy.HistoryCompressionConfig
 import ee.carlrobert.codegpt.agent.strategy.SingleRunStrategyProvider
 import ee.carlrobert.codegpt.agent.strategy.buildAutoCompactPredicate
-import ee.carlrobert.codegpt.settings.configuration.AutoCompactSettings
 import ee.carlrobert.codegpt.agent.tools.McpAgentToolMarker
+import ee.carlrobert.codegpt.settings.configuration.AutoCompactSettings
 import ee.carlrobert.codegpt.settings.configuration.ConfigurationSettings
 import ee.carlrobert.codegpt.settings.hooks.HookEventType
 import ee.carlrobert.codegpt.settings.hooks.HookManager
@@ -102,7 +101,7 @@ object ProxyAIAgent {
             parentModelSelection = modelSelection,
             hookManager = hookManager
         )
-        return AIAgentService<MessageWithContext, String>(
+        return AIAgentService(
             promptExecutor = executor,
             strategy = SingleRunStrategyProvider().build(
                 project,

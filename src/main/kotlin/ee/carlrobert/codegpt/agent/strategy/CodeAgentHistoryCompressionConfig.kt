@@ -57,7 +57,7 @@ internal fun splitForCompaction(
     }
     val head = messages.subList(0, tailStart)
     val summarizable = head.count { it !is Message.System }
-    // The first user message is always kept by Koog, so a single one is nothing to summarize.
+    // The first user message is always kept by Koog, so a single one is nothing to summarise.
     if (summarizable <= 1) {
         return messages to emptyList()
     }

@@ -108,7 +108,7 @@ class ChatHistoryListPanel : BorderLayoutPanel() {
             horizontalScrollBarPolicy = ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER
             verticalScrollBarPolicy = ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED
             // Inset the list horizontally, matching the agent history list. The scroll pane stays
-            // transparent so the inset strips show the surrounding panel, not the list color.
+            // transparent so the inset strips show the surrounding panel, not the list colour.
             border = JBUI.Borders.empty(0, LIST_HORIZONTAL_INSET)
             viewportBorder = null
             isOpaque = false
@@ -217,7 +217,7 @@ class ChatHistoryListPanel : BorderLayoutPanel() {
 
             itemPanel.alignmentX = LEFT_ALIGNMENT
             itemPanel.maximumSize =
-                java.awt.Dimension(Integer.MAX_VALUE, itemPanel.preferredSize.height)
+                Dimension(Integer.MAX_VALUE, itemPanel.preferredSize.height)
             itemsPanel.add(itemPanel)
             conversationPanels[conversation.id] = itemPanel
         }

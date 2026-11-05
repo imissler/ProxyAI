@@ -8,7 +8,6 @@ import ai.koog.agents.core.dsl.builder.EdgeTransformationDslMarker
 import ai.koog.agents.core.dsl.builder.node
 import ai.koog.agents.core.dsl.builder.strategy
 import ai.koog.agents.core.dsl.extension.*
-import ai.koog.agents.core.environment.ReceivedToolResult
 import ai.koog.agents.features.tokenizer.feature.tokenizer
 import ai.koog.prompt.Prompt
 import ai.koog.prompt.executor.model.PromptExecutor
@@ -24,16 +23,15 @@ import ee.carlrobert.codegpt.ReferencedFile
 import ee.carlrobert.codegpt.agent.AgentEvents
 import ee.carlrobert.codegpt.agent.MessageWithContext
 import ee.carlrobert.codegpt.agent.credits.extractCreditsSnapshot
-import ee.carlrobert.codegpt.agent.normalizeToolArgumentsJson
 import ee.carlrobert.codegpt.completions.CompletionRequestUtil
 import ee.carlrobert.codegpt.settings.service.ServiceType
 import ee.carlrobert.codegpt.toolwindow.agent.AgentCreditsEvent
 import ee.carlrobert.codegpt.ui.textarea.TagProcessorFactory
 import ee.carlrobert.codegpt.ui.textarea.header.tag.TagDetails
 import java.util.*
-import kotlin.coroutines.cancellation.CancellationException
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.coroutines.cancellation.CancellationException
 import ee.carlrobert.codegpt.conversations.message.Message as ChatMessage
 
 internal interface AgentRunStrategyProvider {
@@ -57,6 +55,7 @@ data class HistoryCompressionConfig(
 )
 
 internal const val SINGLE_RUN_NODE_CALL_LLM = "call_llm"
+
 /** Pass-through node that run continuations resume after; see PendingRunContinuationFeature. */
 internal const val SINGLE_RUN_NODE_INIT = "init"
 
@@ -75,7 +74,7 @@ internal class SingleRunStrategyProvider : AgentRunStrategyProvider {
         strategy<MessageWithContext, String>("single_run") {
             val planCreated = AtomicBoolean(false)
             val nodeInit by node<MessageWithContext, MessageWithContext>(SINGLE_RUN_NODE_INIT) { it }
-            val nodeCallLLM by node<MessageWithContext, ai.koog.prompt.message.Message.Assistant>(
+            val nodeCallLLM by node<MessageWithContext, Message.Assistant>(
                 SINGLE_RUN_NODE_CALL_LLM
             ) { message ->
                 llm.writeSession {
@@ -108,7 +107,7 @@ internal class SingleRunStrategyProvider : AgentRunStrategyProvider {
 
             val nodeExecuteTool by nodeExecuteTools(parallel = true)
 
-            val nodeSendToolResult by node<ReceivedToolResults, ai.koog.prompt.message.Message.Assistant>("send_tool_results") { toolResultsWrapper ->
+            val nodeSendToolResult by node<ReceivedToolResults, Message.Assistant>("send_tool_results") { toolResultsWrapper ->
                 val results = toolResultsWrapper.toolResults
                 llm.writeSession {
                     appendPrompt {
@@ -116,7 +115,7 @@ internal class SingleRunStrategyProvider : AgentRunStrategyProvider {
                     }
 
                     val messages = prompt.messages
-                    val toolCalls = messages.filterIsInstance<ai.koog.prompt.message.Message.Assistant>()
+                    val toolCalls = messages.filterIsInstance<Message.Assistant>()
                         .flatMap { it.parts }
                         .filterIsInstance<ai.koog.prompt.message.MessagePart.Tool.Call>()
                     val toolCallMessages = toolCalls.size
@@ -162,7 +161,7 @@ internal class SingleRunStrategyProvider : AgentRunStrategyProvider {
                 events.onHistoryCompressionStateChanged(false)
                 it
             }
-            val nodeSendCompressedHistory by node<ReceivedToolResults, ai.koog.prompt.message.Message.Assistant>(
+            val nodeSendCompressedHistory by node<ReceivedToolResults, Message.Assistant>(
                 "send_compressed_history"
             ) {
                 llm.writeSession {
@@ -207,15 +206,15 @@ private suspend fun AIAgentLLMWriteSession.requestResponses(
     stream: Boolean,
     executor: PromptExecutor,
     config: AIAgentConfig,
-    appendResponse: (ai.koog.prompt.message.Message.Assistant) -> Unit
-): ai.koog.prompt.message.Message.Assistant {
+    appendResponse: (Message.Assistant) -> Unit
+): Message.Assistant {
     val response = if (stream) {
         val streamFrames = mutableListOf<StreamFrame>()
         requestLLMStreaming().collect { streamFrames.add(it) }
         streamFrames.toMessageResponse()
     } else {
         val preparedPrompt = config.missingToolsConversionStrategy.convertPrompt(prompt, tools)
-        executor.execute(preparedPrompt, model, tools) as ai.koog.prompt.message.Message.Assistant
+        executor.execute(preparedPrompt, model, tools)
     }
     appendResponse(response)
     return response
@@ -230,7 +229,7 @@ private suspend fun AIAgentLLMWriteSession.requestAndPublish(
     provider: ServiceType,
     stream: Boolean,
     compression: HistoryCompressionConfig
-): ai.koog.prompt.message.Message.Assistant {
+): Message.Assistant {
     val response = try {
         requestResponses(stream, executor, config) { appendPrompt { message(it) } }
     } catch (e: Exception) {
@@ -261,13 +260,13 @@ private const val COMPACTED_MESSAGE = "Conversation compacted."
 private const val NOTHING_TO_COMPACT_MESSAGE = "Nothing to compact yet."
 
 /**
- * Handles `/compact` and the compact button: summarizes the history without calling the model.
+ * Handles `/compact` and the compact button: summarises the history without calling the model.
  */
 private suspend fun AIAgentLLMWriteSession.compactOnDemand(
     compression: HistoryCompressionConfig,
     tokenizer: PromptTokenizer,
     events: AgentEvents
-): ai.koog.prompt.message.Message.Assistant {
+): Message.Assistant {
     val hasHistory = prompt.messages.any { it is Message.User || it is Message.Assistant }
     if (!hasHistory) {
         return Message.Assistant(NOTHING_TO_COMPACT_MESSAGE, ResponseMetaInfo.Empty)
@@ -305,13 +304,13 @@ private suspend fun AIAgentLLMWriteSession.compressHistory(
 }
 
 internal fun appendableResponses(
-    responses: List<ai.koog.prompt.message.Message.Assistant>,
+    responses: List<Message.Assistant>,
     provider: LLMProvider
-): List<ai.koog.prompt.message.Message.Assistant> {
+): List<Message.Assistant> {
     return responses
 }
 
-internal fun extractAssistantOutput(response: ai.koog.prompt.message.Message.Assistant): String {
+internal fun extractAssistantOutput(response: Message.Assistant): String {
     return ee.carlrobert.codegpt.completions.CompletionTextExtractor.extract(listOf(response))
 }
 
@@ -321,7 +320,7 @@ private fun publishUsageAndCredits(
     events: AgentEvents,
     sessionId: String,
     provider: ServiceType,
-    responses: List<ai.koog.prompt.message.Message.Assistant>,
+    responses: List<Message.Assistant>,
 ) {
     events.onTokenUsageAvailable(promptTokenCount(prompt, tokenizer, responses).toLong())
     publishCreditsIfAvailable(sessionId, provider, responses, events)
@@ -330,7 +329,7 @@ private fun publishUsageAndCredits(
 private fun promptTokenCount(
     prompt: Prompt,
     tokenizer: PromptTokenizer,
-    responses: List<ai.koog.prompt.message.Message.Assistant>
+    responses: List<Message.Assistant>
 ): Int {
     return if (prompt.latestTokenUsage == 0) {
         tokenizer.tokenCountFor(prompt)
@@ -380,7 +379,7 @@ private fun buildReferencedFilesContext(referencedFilePaths: List<String>): Stri
 private fun publishCreditsIfAvailable(
     sessionId: String,
     provider: ServiceType,
-    responses: List<ai.koog.prompt.message.Message.Assistant>,
+    responses: List<Message.Assistant>,
     events: AgentEvents,
 ) {
     if (provider != ServiceType.PROXYAI) return
@@ -395,10 +394,10 @@ private fun publishCreditsIfAvailable(
 }
 
 @EdgeTransformationDslMarker
-private infix fun <IncomingOutput, OutgoingInput> AIAgentEdgeBuilderIntermediate<IncomingOutput, ai.koog.prompt.message.Message.Assistant, OutgoingInput>.onSingleAssistantResponse(
+private infix fun <IncomingOutput, OutgoingInput> AIAgentEdgeBuilderIntermediate<IncomingOutput, Message.Assistant, OutgoingInput>.onSingleAssistantResponse(
     block: suspend (String) -> Boolean
 ): AIAgentEdgeBuilderIntermediate<IncomingOutput, String, OutgoingInput> {
-    return onIsInstance(ai.koog.prompt.message.Message.Assistant::class)
+    return onIsInstance(Message.Assistant::class)
         .transformed { response ->
             if (response.parts.any { it is ai.koog.prompt.message.MessagePart.Tool.Call }) {
                 null

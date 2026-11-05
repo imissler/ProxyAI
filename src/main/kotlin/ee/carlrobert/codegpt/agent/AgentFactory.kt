@@ -10,16 +10,13 @@ import ai.koog.agents.core.dsl.extension.ReceivedToolResults
 import ai.koog.agents.core.dsl.extension.nodeExecuteTools
 import ai.koog.agents.core.dsl.extension.onTextMessage
 import ai.koog.agents.core.dsl.extension.onToolCalls
-import ai.koog.agents.core.environment.ReceivedToolResult
 import ai.koog.agents.core.feature.handler.tool.ToolCallCompletedContext
 import ai.koog.agents.core.feature.handler.tool.ToolCallStartingContext
 import ai.koog.agents.core.tools.ToolDescriptor
 import ai.koog.agents.core.tools.ToolRegistry
-import ee.carlrobert.codegpt.agent.tools.ShellCommandConfirmation
 import ai.koog.agents.features.eventHandler.feature.handleEvents
 import ai.koog.agents.features.tokenizer.feature.MessageTokenizer
 import ai.koog.agents.features.tokenizer.feature.tokenizer
-import ai.koog.prompt.tokenizer.Tokenizer
 import ai.koog.prompt.Prompt
 import ai.koog.prompt.dsl.prompt
 import ai.koog.prompt.executor.clients.LLMClient
@@ -35,6 +32,7 @@ import ai.koog.prompt.llm.LLMProvider
 import ai.koog.prompt.llm.LLModel
 import ai.koog.prompt.message.Message
 import ai.koog.prompt.params.LLMParams
+import ai.koog.prompt.tokenizer.Tokenizer
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import ee.carlrobert.codegpt.EncodingManager
@@ -43,6 +41,7 @@ import ee.carlrobert.codegpt.agent.clients.CustomOpenAILLMClient
 import ee.carlrobert.codegpt.agent.clients.RetryingPromptExecutor
 import ee.carlrobert.codegpt.agent.credits.extractCreditsSnapshot
 import ee.carlrobert.codegpt.agent.tools.BashCommandConfirmationHandler
+import ee.carlrobert.codegpt.agent.tools.ShellCommandConfirmation
 import ee.carlrobert.codegpt.settings.hooks.HookManager
 import ee.carlrobert.codegpt.settings.models.LLMClientFactory
 import ee.carlrobert.codegpt.settings.models.ModelSelection
@@ -249,6 +248,7 @@ object AgentFactory {
                     params.withAnthropicReasoning()
                 }
             }
+
             else -> params
         }
         return withParams(params)
@@ -475,7 +475,7 @@ object AgentFactory {
             onToolCallStarting { ctx -> onAgentToolCallStarting?.invoke(ctx) }
             onToolCallCompleted { ctx -> onAgentToolCallCompleted?.invoke(ctx) }
             onNodeExecutionCompleted { ctx ->
-                val responses = (ctx.output as? List<*>)?.filterIsInstance<ai.koog.prompt.message.Message.Assistant>()
+                val responses = (ctx.output as? List<*>)?.filterIsInstance<Message.Assistant>()
                     ?: return@onNodeExecutionCompleted
                 if (responses.isEmpty()) return@onNodeExecutionCompleted
                 if (provider == ServiceType.PROXYAI) {
@@ -486,7 +486,7 @@ object AgentFactory {
     }
 
     private fun extractCredits(
-        responses: List<ai.koog.prompt.message.Message.Assistant>,
+        responses: List<Message.Assistant>,
         sessionId: String
     ): AgentCreditsEvent? {
         val credits = extractCreditsSnapshot(responses) ?: return null
@@ -502,7 +502,7 @@ object AgentFactory {
         executor: PromptExecutor,
         tokenCounter: AtomicLong?
     ) = strategy<String, String>("subagent_single_run_sequential") {
-        val nodeCallLLM by node<String, ai.koog.prompt.message.Message.Assistant> { input ->
+        val nodeCallLLM by node<String, Message.Assistant> { input ->
             llm.writeSession {
                 appendPrompt { user(input) }
                 tokenCounter?.addAndGet(tokenizer().tokenCountFor(prompt).toLong())
@@ -515,7 +515,7 @@ object AgentFactory {
             }
         }
         val nodeExecuteTool by nodeExecuteTools(parallel = true)
-        val nodeSendToolResult by node<ReceivedToolResults, ai.koog.prompt.message.Message.Assistant> { toolResultsWrapper ->
+        val nodeSendToolResult by node<ReceivedToolResults, Message.Assistant> { toolResultsWrapper ->
             val results = toolResultsWrapper.toolResults
             llm.writeSession {
                 appendPrompt {
@@ -544,11 +544,11 @@ object AgentFactory {
     private suspend fun AIAgentLLMWriteSession.requestResponses(
         executor: PromptExecutor,
         config: AIAgentConfig,
-        appendResponse: (ai.koog.prompt.message.Message.Assistant) -> Unit,
+        appendResponse: (Message.Assistant) -> Unit,
         tokenCounter: AtomicLong?
-    ): ai.koog.prompt.message.Message.Assistant {
+    ): Message.Assistant {
         val preparedPrompt = config.missingToolsConversionStrategy.convertPrompt(prompt, tools)
-        val response = executor.execute(preparedPrompt, model, tools) as ai.koog.prompt.message.Message.Assistant
+        val response = executor.execute(preparedPrompt, model, tools)
         appendResponse(response)
         tokenCounter?.addAndGet(EncodingManager.getInstance().countTokens(response.textContent()).toLong())
         return response
