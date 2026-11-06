@@ -67,6 +67,8 @@ tasks {
     withType<KotlinCompile> {
       compilerOptions.jvmTarget.set(JvmTarget.fromTarget(it))
       compilerOptions.freeCompilerArgs.add("-opt-in=kotlin.time.ExperimentalTime")
+      // IDE 2026.3 ships Kotlin metadata 2.5.0, newer than our compiler can read
+      compilerOptions.freeCompilerArgs.add("-Xskip-metadata-version-check")
     }
   }
 }

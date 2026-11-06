@@ -346,11 +346,12 @@ class InlineEditInlayRenderer(
         lexer.start(text)
         val doc = pane.styledDocument
         val scheme = EditorColorsManager.getInstance().globalScheme
-        while (lexer.tokenType != null) {
+        while (true) {
+            val tokenType = lexer.tokenType ?: break
             val start = lexer.tokenStart
             val end = lexer.tokenEnd
             val segment = text.substring(start, end)
-            val keys = highlighter.getTokenHighlights(lexer.tokenType)
+            val keys = highlighter.getTokenHighlights(tokenType)
             val attrs = keys.firstOrNull()?.let { scheme.getAttributes(it) }
             val style = SimpleAttributeSet()
             val fg = attrs?.foregroundColor ?: editor.colorsScheme.defaultForeground
